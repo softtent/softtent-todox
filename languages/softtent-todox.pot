@@ -1,0 +1,349 @@
+# Copyright (C) 2026 SoftTent
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: SoftTent TodoX 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/softtent-todox\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-05-22T16:59:04+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.11.0\n"
+"X-Domain: softtent-todox\n"
+
+#. Plugin Name of the plugin
+#: softtent-todox.php
+msgid "SoftTent TodoX"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: softtent-todox.php
+msgid "https://wordpress.org/plugins/softtent-todox"
+msgstr ""
+
+#. Description of the plugin
+#: softtent-todox.php
+msgid "A professional project management system for WordPress. Manage workspaces, departments, teams, projects, sprints, and tasks with a beautiful Kanban board."
+msgstr ""
+
+#. Author of the plugin
+#: softtent-todox.php
+msgid "SoftTent"
+msgstr ""
+
+#. Author URI of the plugin
+#: softtent-todox.php
+msgid "https://softtent.com"
+msgstr ""
+
+#: includes/Abstracts/RestApi.php:50
+msgid "Sorry, you are not allowed to do that."
+msgstr ""
+
+#: includes/Abstracts/RestApi.php:67
+msgid "Authentication required."
+msgstr ""
+
+#: includes/Abstracts/RestApi.php:81
+msgid "You are not a member of this workspace."
+msgstr ""
+
+#: includes/Admin/Menu.php:31
+#: includes/Admin/Menu.php:32
+#: includes/Frontend/App.php:43
+#: templates/app.php:8
+msgid "TodoX"
+msgstr ""
+
+#: includes/Api/Controllers/DashboardController.php:58
+#: includes/Api/Controllers/DashboardController.php:77
+#: includes/Api/Controllers/DashboardController.php:105
+#: includes/Api/Controllers/DepartmentController.php:63
+#: includes/Api/Controllers/DepartmentController.php:89
+#: includes/Api/Controllers/ProjectController.php:63
+#: includes/Api/Controllers/TaxonomyController.php:68
+#: includes/Api/Controllers/TeamController.php:88
+msgid "workspace_id is required."
+msgstr ""
+
+#: includes/Api/Controllers/DepartmentController.php:78
+msgid "Department not found."
+msgstr ""
+
+#: includes/Api/Controllers/DepartmentController.php:85
+msgid "Department name is required."
+msgstr ""
+
+#: includes/Api/Controllers/DepartmentController.php:95
+msgid "Department created."
+msgstr ""
+
+#: includes/Api/Controllers/DepartmentController.php:96
+msgid "Failed to create department."
+msgstr ""
+
+#: includes/Api/Controllers/DepartmentController.php:104
+msgid "Department updated."
+msgstr ""
+
+#: includes/Api/Controllers/DepartmentController.php:110
+msgid "Department deleted."
+msgstr ""
+
+#: includes/Api/Controllers/NotificationController.php:79
+msgid "Notification marked as read."
+msgstr ""
+
+#: includes/Api/Controllers/NotificationController.php:85
+msgid "All notifications marked as read."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:82
+msgid "Project not found."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:91
+msgid "Project name is required."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:95
+msgid "Workspace ID is required."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:99
+msgid "Team ID is required."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:117
+msgid "Project created."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:118
+msgid "Failed to create project."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:126
+msgid "Project updated."
+msgstr ""
+
+#: includes/Api/Controllers/ProjectController.php:132
+msgid "Project deleted."
+msgstr ""
+
+#: includes/Api/Controllers/SettingsController.php:68
+msgid "Settings saved."
+msgstr ""
+
+#: includes/Api/Controllers/SprintController.php:63
+#: includes/Api/Controllers/SprintController.php:91
+msgid "project_id is required."
+msgstr ""
+
+#: includes/Api/Controllers/SprintController.php:80
+msgid "Sprint not found."
+msgstr ""
+
+#: includes/Api/Controllers/SprintController.php:87
+msgid "Sprint name is required."
+msgstr ""
+
+#: includes/Api/Controllers/SprintController.php:97
+msgid "Sprint created."
+msgstr ""
+
+#: includes/Api/Controllers/SprintController.php:98
+msgid "Failed to create sprint."
+msgstr ""
+
+#: includes/Api/Controllers/SprintController.php:106
+msgid "Sprint updated."
+msgstr ""
+
+#: includes/Api/Controllers/SprintController.php:112
+msgid "Sprint deleted."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:70
+msgid "Subtask not found."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:78
+msgid "Subtask title is required."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:84
+msgid "Subtask created."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:85
+msgid "Failed to create subtask."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:93
+msgid "Subtask updated."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:99
+msgid "Subtask deleted."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:162
+#: includes/Api/Controllers/TaskController.php:197
+#: includes/Api/Controllers/TaskController.php:210
+msgid "Task not found."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:172
+msgid "Task title is required."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:186
+msgid "Failed to create task."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:189
+msgid "Task created."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:202
+msgid "Task updated."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:215
+msgid "Task deleted."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:222
+msgid "Items array is required."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:227
+msgid "Tasks reordered."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:239
+msgid "Comment content is required."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:246
+msgid "Comment added."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:257
+msgid "Comment updated."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:265
+msgid "Comment deleted."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:78
+msgid "Taxonomy name is required."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:84
+msgid "Taxonomy created."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:85
+msgid "Failed to create taxonomy."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:93
+msgid "Taxonomy updated."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:99
+msgid "Taxonomy deleted."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:106
+msgid "items must be an array."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:111
+msgid "Taxonomies reordered."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:105
+msgid "Team not found."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:117
+msgid "Team name is required."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:123
+msgid "Team created."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:124
+msgid "Failed to create team."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:132
+msgid "Team updated."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:138
+msgid "Team deleted."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:151
+#: includes/Api/Controllers/WorkspaceController.php:195
+msgid "User not found."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:156
+#: includes/Api/Controllers/WorkspaceController.php:200
+msgid "Member added."
+msgstr ""
+
+#: includes/Api/Controllers/TeamController.php:162
+#: includes/Api/Controllers/WorkspaceController.php:213
+msgid "Member removed."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:109
+#: includes/Api/Controllers/WorkspaceController.php:163
+msgid "Workspace not found."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:113
+#: includes/Api/Controllers/WorkspaceController.php:150
+#: includes/Api/Controllers/WorkspaceController.php:179
+#: includes/Api/Controllers/WorkspaceController.php:191
+#: includes/Api/Controllers/WorkspaceController.php:208
+msgid "Access denied."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:126
+msgid "Workspace name is required."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:140
+msgid "Failed to create workspace."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:143
+msgid "Workspace created."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:155
+msgid "Workspace updated."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:167
+msgid "Only the workspace owner can delete it."
+msgstr ""
+
+#: includes/Api/Controllers/WorkspaceController.php:172
+msgid "Workspace deleted."
+msgstr ""
+
+#: includes/Hooks/Manager.php:32
+msgid "Manage TodoX"
+msgstr ""

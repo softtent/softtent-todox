@@ -1,0 +1,129 @@
+<?xml version="1.0"?>
+<ruleset name="WordPress Coding Standards for TodoX">
+    <description>Generally-applicable sniffs for WordPress plugins.</description>
+
+    <!-- What to scan -->
+    <file>.</file>
+    <exclude-pattern>*/assets/*</exclude-pattern>
+    <exclude-pattern>*/src/*</exclude-pattern>
+    <exclude-pattern>*/build/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
+
+    <!-- How to scan -->
+    <arg value="sp"/>
+    <arg name="basepath" value="./"/>
+    <arg name="colors"/>
+    <arg name="extensions" value="php"/>
+    <arg name="parallel" value="8"/>
+
+    <!-- Rules: Check PHP version compatibility (plugin requires PHP 8.0+) -->
+    <config name="testVersion" value="8.0-"/>
+    <rule ref="PHPCompatibilityWP"/>
+
+    <!-- Rules: WordPress Coding Standards -->
+    <config name="minimum_supported_wp_version" value="6.4"/>
+    <rule ref="WordPress-Core"/>
+    <rule ref="WordPress">
+        <exclude name="Generic.WhiteSpace.DisallowSpaceIndent"/>
+    </rule>
+    <rule ref="WordPress-Extra"/>
+    <rule ref="WordPress-Docs"/>
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array" value="softtent-todox"/>
+        </properties>
+    </rule>
+    <rule ref="WordPress.WhiteSpace.ControlStructureSpacing">
+        <properties>
+            <property name="blank_line_check" value="true"/>
+        </properties>
+    </rule>
+
+    <rule ref="Squiz.Commenting">
+        <severity>0</severity>
+    </rule>
+    <rule ref="PEAR.Functions.FunctionCallSignature.MultipleArguments">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Generic.Commenting.DocComment.SpacingBeforeTags">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.Files.FileName">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.PHP.DevelopmentFunctions">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Generic.Formatting.MultipleStatementAlignment.NotSameWarning">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Generic.Commenting.DocComment.MissingShort">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.PHP.YodaConditions.NotYoda">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Generic.Functions.OpeningFunctionBraceKernighanRitchie.ContentAfterBrace">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.WhiteSpace.ControlStructureSpacing.NoSpaceAfterCloseParenthesis">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound">
+        <type>warning</type>
+    </rule>
+    <rule ref="WordPress.DB.DirectDatabaseQuery.NoCaching">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.PHP.StrictInArray.MissingTrueStrict">
+        <type>error</type>
+    </rule>
+    <rule ref="WordPress.DB.DirectDatabaseQuery.DirectQuery">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.DB.PreparedSQL.NotPrepared">
+        <type>warning</type>
+    </rule>
+    <rule ref="WordPress.Security.EscapeOutput.OutputNotEscaped">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.PHP.DevelopmentFunctions.error_log_var_export">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Generic.Arrays.DisallowShortArraySyntax">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Universal.Arrays.DisallowShortArraySyntax.Found">
+        <severity>0</severity>
+    </rule>
+    <!-- Convert array() to [] -->
+    <rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
+    <rule ref="Universal.Files.SeparateFunctionsFromOO.Mixed">
+        <severity>0</severity>
+    </rule>
+    <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+        <properties>
+            <property name="prefixes" type="array">
+                <element value="softtent"/>
+                <element value="st_todox"/>
+                <element value="ST_TodoX"/>
+                <element value="ST_TODOX"/>
+            </property>
+        </properties>
+    </rule>
+    <rule ref="WordPress.Security.ValidatedSanitizedInput">
+        <properties>
+            <property name="customSanitizingFunctions" type="array">
+                <element value="wc_clean"/>
+            </property>
+        </properties>
+    </rule>
+</ruleset>

@@ -1,2 +1,0 @@
-# softtent-todox
-WordPress Plugin
