@@ -1,33 +1,143 @@
 /**
  * External dependencies
  */
-import { useState } from '@wordpress/element';
+import { useState, useMemo, useEffect, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
-import { Briefcase, Users, FolderKanban, Crown, MoreHorizontal, Pencil, Trash2, Plus } from 'lucide-react';
+import {
+	DndContext,
+	DragEndEvent,
+	DragOverlay,
+	DragStartEvent,
+	PointerSensor,
+	useSensor,
+	useSensors,
+	closestCenter,
+} from '@dnd-kit/core';
+import {
+	SortableContext,
+	useSortable,
+	verticalListSortingStrategy,
+	arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Briefcase, Users, FolderKanban, Crown, Pencil, Trash2, Plus, Search, GripVertical } from 'lucide-react';
 
 /**
  * Internal dependencies
  */
 import { teamsApi, departmentsApi, usersApi } from '../../api';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Avatar from '../../components/ui/Avatar';
 import Spinner from '../../components/ui/Spinner';
+import DepartmentSelector from '../../components/ui/DepartmentSelector';
+import { ColorPicker, COLORS_ENTITY } from '../../components/inputs';
 import type { Team, TeamMember, CreateTeamInput } from '../../types';
 
-const COLORS = [ '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6' ];
-
 const emptyForm = (): CreateTeamInput => ( {
-	workspace_id:  0,
-	department_id: 0,
-	name:          '',
-	description:   '',
-	color:         '#6366f1',
-	manager_id:    null,
+	workspace_id:   0,
+	department_ids: [],
+	name:           '',
+	description:    '',
+	color:          '#6366f1',
+	manager_id:     null,
 } );
+
+/* ---- Sortable row ---- */
+const SortableRow = ( {
+	team,
+	checked,
+	onSelect,
+	onEdit,
+	onDelete,
+	onMembers,
+}: {
+	team:      Team;
+	checked:   boolean;
+	onSelect:  ( id: number ) => void;
+	onEdit:    ( t: Team ) => void;
+	onDelete:  ( t: Team ) => void;
+	onMembers: ( t: Team ) => void;
+} ) => {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable( { id: team.id } );
+
+	const style: React.CSSProperties = {
+		transform: CSS.Transform.toString( transform ),
+		transition,
+		opacity:   isDragging ? 0.35 : 1,
+		position:  'relative',
+		zIndex:    isDragging ? 1 : 'auto',
+	};
+
+	return (
+		<tr ref={ setNodeRef } style={ style } { ...attributes } className={ `st-todox-table__row ${ isDragging ? 'st-todox-table__row--dragging' : '' } ${ checked ? 'st-todox-table__row--selected' : '' }` }>
+			<td className="st-todox-table__drag-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<span className="st-todox-table__drag-handle" { ...listeners }>
+					<GripVertical size={ 14 } />
+				</span>
+			</td>
+			<td className="st-todox-table__check-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<input type="checkbox" checked={ checked } onChange={ () => onSelect( team.id ) } />
+			</td>
+			<td className="st-todox-table__title-cell">
+				<div className="st-todox-entity-name">
+					<span className="st-todox-entity-name__dot" style={ { background: team.color } } />
+					<span className="st-todox-entity-name__text">{ team.name }</span>
+				</div>
+			</td>
+			<td>
+				{ team.departments?.length > 0 ? (
+					<span className="st-todox-text--muted">
+						{ team.departments.map( ( d ) => d.name ).join( ', ' ) }
+					</span>
+				) : (
+					<span className="st-todox-text--muted">—</span>
+				) }
+			</td>
+			<td>
+				{ team.manager ? (
+					<div className="st-todox-assignee">
+						<Avatar name={ team.manager.name } src={ team.manager.avatar } size={ 22 } />
+						<span className="st-todox-assignee__name">{ team.manager.name }</span>
+					</div>
+				) : (
+					<span className="st-todox-text--muted">—</span>
+				) }
+			</td>
+			<td>
+				<div className="st-todox-entity-count">
+					<Users size={ 12 } />
+					{ team.members_count ?? 0 }
+				</div>
+			</td>
+			<td>
+				<div className="st-todox-entity-count">
+					<FolderKanban size={ 12 } />
+					{ team.projects_count ?? 0 }
+				</div>
+			</td>
+			<td className="st-todox-table__actions-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<div className="st-todox-table__row-actions">
+					<button className="st-todox-table__action-btn" title="Members" onClick={ () => onMembers( team ) }>
+						<Users size={ 13 } />
+					</button>
+					<button className="st-todox-table__action-btn" title="Edit" onClick={ () => onEdit( team ) }>
+						<Pencil size={ 13 } />
+					</button>
+					<button className="st-todox-table__action-btn st-todox-table__action-btn--danger" title="Delete" onClick={ () => onDelete( team ) }>
+						<Trash2 size={ 13 } />
+					</button>
+				</div>
+			</td>
+		</tr>
+	);
+};
+
+const EMPTY_TEAMS: Team[] = [];
 
 const TeamsPage = () => {
 	const qc = useQueryClient();
@@ -38,12 +148,17 @@ const TeamsPage = () => {
 	const [ editing, setEditing ]                 = useState< Team | null >( null );
 	const [ selectedTeam, setSelectedTeam ]       = useState< Team | null >( null );
 	const [ deleteTarget, setDeleteTarget ]       = useState< Team | null >( null );
-	const [ menuOpen, setMenuOpen ]               = useState< number | null >( null );
 	const [ form, setForm ]                       = useState< CreateTeamInput >( emptyForm() );
 	const [ addUserId, setAddUserId ]             = useState( '' );
 	const [ addUserRole, setAddUserRole ]         = useState< 'lead' | 'member' >( 'member' );
+	const [ search, setSearch ]                   = useState( '' );
+	const [ ordered, setOrdered ]                 = useState< Team[] >( [] );
+	const [ activeDrag, setActiveDrag ]           = useState< Team | null >( null );
+	const [ selectedIds, setSelectedIds ]         = useState< Set< number > >( new Set() );
+	const [ bulkConfirmOpen, setBulkConfirmOpen ] = useState( false );
+	const selectAllRef                            = useRef< HTMLInputElement >( null );
 
-	const { data: teams = [], isLoading } = useQuery( {
+	const { data: teams = EMPTY_TEAMS, isLoading } = useQuery( {
 		queryKey: [ 'teams', activeWorkspaceId ],
 		queryFn:  () => teamsApi.getAll( activeWorkspaceId! ),
 		enabled:  !! activeWorkspaceId,
@@ -68,6 +183,29 @@ const TeamsPage = () => {
 		enabled:  !! selectedTeam,
 	} );
 
+	useEffect( () => {
+		setOrdered( teams as Team[] );
+	}, [ teams ] );
+
+	const filtered = useMemo( () => {
+		const q = search.trim().toLowerCase();
+		if ( ! q ) return ordered;
+		return ordered.filter( ( t ) => t.name.toLowerCase().includes( q ) );
+	}, [ ordered, search ] );
+
+	const allSelected  = filtered.length > 0 && filtered.every( ( t ) => selectedIds.has( t.id ) );
+	const someSelected = ! allSelected && filtered.some( ( t ) => selectedIds.has( t.id ) );
+
+	useEffect( () => {
+		if ( selectAllRef.current ) selectAllRef.current.indeterminate = someSelected;
+	}, [ someSelected ] );
+
+	const toggleSelect = ( id: number ) =>
+		setSelectedIds( ( prev ) => { const s = new Set( prev ); s.has( id ) ? s.delete( id ) : s.add( id ); return s; } );
+
+	const toggleAll = () =>
+		setSelectedIds( allSelected ? new Set() : new Set( filtered.map( ( t ) => t.id ) ) );
+
 	const invalidate = () => qc.invalidateQueries( { queryKey: [ 'teams', activeWorkspaceId ] } );
 
 	const createMutation = useMutation( {
@@ -89,6 +227,12 @@ const TeamsPage = () => {
 		onError:    ( err: Error ) => toast.error( err.message ),
 	} );
 
+	const bulkDeleteMutation = useMutation( {
+		mutationFn: ( ids: number[] ) => Promise.all( ids.map( ( id ) => teamsApi.delete( id ) ) ),
+		onSuccess:  () => { invalidate(); setSelectedIds( new Set() ); toast.success( 'Teams deleted.' ); },
+		onError:    ( err: Error ) => toast.error( err.message ),
+	} );
+
 	const addMemberMutation = useMutation( {
 		mutationFn: () => teamsApi.addMember( selectedTeam!.id, Number( addUserId ), addUserRole ),
 		onSuccess:  () => {
@@ -105,6 +249,34 @@ const TeamsPage = () => {
 		onError:    ( err: Error ) => toast.error( err.message ),
 	} );
 
+	const reorderMutation = useMutation( {
+		mutationFn: ( items: { id: number; position: number }[] ) => teamsApi.reorder( items ),
+		onError:    ( err: Error ) => {
+			toast.error( err.message );
+			setOrdered( teams as Team[] );
+		},
+	} );
+
+	const sensors = useSensors( useSensor( PointerSensor, { activationConstraint: { distance: 5 } } ) );
+
+	const handleDragStart = ( event: DragStartEvent ) => {
+		setActiveDrag( ordered.find( ( t ) => t.id === event.active.id ) ?? null );
+	};
+
+	const handleDragEnd = ( event: DragEndEvent ) => {
+		const { active, over } = event;
+		setActiveDrag( null );
+		if ( ! over || active.id === over.id ) return;
+
+		setOrdered( ( prev ) => {
+			const oldIdx    = prev.findIndex( ( t ) => t.id === active.id );
+			const newIdx    = prev.findIndex( ( t ) => t.id === over.id );
+			const reordered = arrayMove( prev, oldIdx, newIdx );
+			reorderMutation.mutate( reordered.map( ( t, i ) => ( { id: t.id, position: i } ) ) );
+			return reordered;
+		} );
+	};
+
 	const openCreate = () => {
 		setEditing( null );
 		setForm( { ...emptyForm(), workspace_id: activeWorkspaceId! } );
@@ -114,14 +286,13 @@ const TeamsPage = () => {
 	const openEdit = ( team: Team ) => {
 		setEditing( team );
 		setForm( {
-			workspace_id:  team.workspace_id,
-			department_id: team.department_id,
-			name:          team.name,
-			description:   team.description ?? '',
-			color:         team.color,
-			manager_id:    team.manager_id,
+			workspace_id:   team.workspace_id,
+			department_ids: team.department_ids ?? [],
+			name:           team.name,
+			description:    team.description ?? '',
+			color:          team.color,
+			manager_id:     team.manager_id,
 		} );
-		setMenuOpen( null );
 		setModalOpen( true );
 	};
 
@@ -129,7 +300,7 @@ const TeamsPage = () => {
 
 	const doSubmit = () => {
 		if ( ! form.name.trim() ) { toast.error( 'Name is required.' ); return; }
-		if ( ! form.department_id ) { toast.error( 'Department is required.' ); return; }
+		if ( ! form.department_ids?.length ) { toast.error( 'Select at least one department.' ); return; }
 		if ( editing ) {
 			updateMutation.mutate( { id: editing.id, data: form } );
 		} else {
@@ -141,137 +312,127 @@ const TeamsPage = () => {
 
 	return (
 		<div className="st-todox-page">
-			{/* Page Header */}
-			<div className="st-todox-page-hd">
-				<div className="st-todox-page-hd__left">
-					<div className="st-todox-page-hd__icon-box">
-						<Briefcase size={ 20 } />
-					</div>
-					<div>
-						<h1 className="st-todox-page-hd__title">Teams</h1>
-						<p className="st-todox-page-hd__sub">
-							{ activeWorkspace?.name } · { teams.length } team{ teams.length !== 1 ? 's' : '' }
-						</p>
+			<PageHeader
+				title="Teams"
+				description={ `${ activeWorkspace?.name } · ${ ( teams as Team[] ).length } team${ ( teams as Team[] ).length !== 1 ? 's' : '' }` }
+				actions={
+					activeWorkspaceId ? (
+						<Button onClick={ openCreate } leftIcon={ <Plus size={ 14 } /> }>
+							New Team
+						</Button>
+					) : undefined
+				}
+			/>
+
+			<div className="st-todox-surface-card">
+				{/* Toolbar */}
+				<div className="st-todox-tasks-toolbar">
+					<div className="st-todox-tasks-toolbar__search">
+						<Search size={ 14 } className="st-todox-tasks-toolbar__search-icon" />
+						<input
+							type="search"
+							className="st-todox-tasks-toolbar__input"
+							placeholder="Search teams…"
+							value={ search }
+							onChange={ ( e ) => setSearch( e.target.value ) }
+						/>
 					</div>
 				</div>
-				{ activeWorkspaceId && (
-					<Button onClick={ openCreate }><Plus size={ 14 } /> New Team</Button>
-				) }
-			</div>
 
-			{ isLoading ? (
-				<Spinner />
-			) : teams.length === 0 ? (
-				<div className="st-todox-empty-dashed">
-					<Briefcase size={ 40 } className="st-todox-empty-dashed__icon" />
-					<p className="st-todox-empty-dashed__title">No teams yet</p>
-					<p className="st-todox-empty-dashed__desc">Create your first team to get started.</p>
-					{ activeWorkspaceId && (
-						<Button onClick={ openCreate } className="st-todox-empty-dashed__action">New Team</Button>
-					) }
-				</div>
-			) : (
-				<div className="st-todox-entity-grid">
-					{ teams.map( ( team: Team ) => (
-						<div key={ team.id } className="st-todox-entity-card" style={ { borderTopColor: team.color, borderTopWidth: '3px' } }>
-							<div className="st-todox-entity-card__body">
-								{/* Head row */}
-								<div className="st-todox-entity-card__head-row">
-									<div className="st-todox-entity-card__avatar" style={ { background: team.color } }>
-										{ team.name.slice( 0, 1 ).toUpperCase() }
-									</div>
-									<div className="st-todox-entity-card__meta">
-										<h3 className="st-todox-entity-card__name">{ team.name }</h3>
-										{ team.department?.name && (
-											<p className="st-todox-entity-card__desc">{ team.department.name }</p>
-										) }
-									</div>
-									{/* Actions */}
-									<div className="st-todox-entity-card__menu-wrap">
-										<button
-											className="st-todox-entity-card__menu-btn"
-											onClick={ ( e ) => { e.stopPropagation(); setMenuOpen( menuOpen === team.id ? null : team.id ); } }
-										>
-											<MoreHorizontal size={ 15 } />
-										</button>
-										{ menuOpen === team.id && (
-											<>
-												<div className="st-todox-dropdown-backdrop" onClick={ () => setMenuOpen( null ) } />
-												<div className="st-todox-entity-card__menu-dropdown">
-													<button onClick={ () => openEdit( team ) }>
-														<Pencil size={ 13 } /> Edit
-													</button>
-													<button
-														onClick={ () => { setSelectedTeam( team ); setMemberModalOpen( true ); setMenuOpen( null ); } }
-													>
-														<Users size={ 13 } /> Members
-													</button>
-													<button
-														className="st-todox-entity-card__menu-danger"
-														onClick={ () => { setDeleteTarget( team ); setMenuOpen( null ); } }
-													>
-														<Trash2 size={ 13 } /> Delete
-													</button>
-											</div>
-											</>
-										) }
-									</div>
-								</div>
-
-								{/* Stats */}
-								<div className="st-todox-entity-card__stats">
-									<span>
-										<Users size={ 13 } />
-										<strong>{ team.members_count ?? 0 }</strong> member{ ( team.members_count ?? 0 ) !== 1 ? 's' : '' }
-									</span>
-									<span>
-										<FolderKanban size={ 13 } />
-										<strong>{ team.projects_count ?? 0 }</strong> project{ ( team.projects_count ?? 0 ) !== 1 ? 's' : '' }
-									</span>
-								</div>
-
-								{/* Members preview */}
-								{ team.members && team.members.length > 0 && (
-									<div className="st-todox-entity-card__members">
-										{ team.members.slice( 0, 4 ).map( ( m: TeamMember ) => (
-											<div key={ m.id } className="st-todox-entity-card__member-row">
-												<Avatar name={ m.name } src={ m.avatar } size={ 24 } />
-												<span className="st-todox-entity-card__member-name">{ m.name }</span>
-												{ m.team_role === 'lead' && (
-													<span className="st-todox-entity-card__badge st-todox-entity-card__badge--lead">
-														<Crown size={ 10 } /> LEAD
-													</span>
-												) }
-											</div>
-										) ) }
-										{ ( team.members_count ?? 0 ) > 4 && (
-											<p className="st-todox-entity-card__more">+{ ( team.members_count ?? 0 ) - 4 } more members</p>
-										) }
-									</div>
-								) }
-
-								{/* Footer — manager */}
-								{ team.manager && (
-									<div className="st-todox-entity-card__footer">
-										<Avatar name={ team.manager.name } src={ team.manager.avatar } size={ 18 } />
-										<span className="st-todox-entity-card__footer-label">{ team.manager.name }</span>
-									</div>
-								) }
-
-								{/* Manage members button */}
-								<div className="st-todox-entity-card__action-row">
+				{ isLoading ? (
+					<div className="st-todox-page-loader"><Spinner /></div>
+				) : ( teams as Team[] ).length === 0 ? (
+					<div className="st-todox-empty-inline">
+						<Briefcase size={ 36 } strokeWidth={ 1.5 } style={ { opacity: 0.3 } } />
+						<p>No teams yet — create your first one.</p>
+						{ activeWorkspaceId && (
+							<Button size="sm" onClick={ openCreate } leftIcon={ <Plus size={ 13 } /> }>
+								New Team
+							</Button>
+						) }
+					</div>
+				) : filtered.length === 0 ? (
+					<div className="st-todox-empty-inline">
+						<Briefcase size={ 36 } strokeWidth={ 1.5 } style={ { opacity: 0.3 } } />
+						<p>No teams match your search.</p>
+					</div>
+				) : (
+					<DndContext
+						sensors={ sensors }
+						collisionDetection={ closestCenter }
+						onDragStart={ handleDragStart }
+						onDragEnd={ handleDragEnd }
+					>
+						{ selectedIds.size > 0 && (
+							<div className="st-todox-bulk-bar">
+								<span className="st-todox-bulk-bar__count">{ selectedIds.size } selected</span>
+								<div className="st-todox-bulk-bar__actions">
 									<button
-										className="st-todox-entity-card__text-btn"
-										onClick={ () => { setSelectedTeam( team ); setMemberModalOpen( true ); } }
+										className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--danger"
+										onClick={ () => setBulkConfirmOpen( true ) }
 									>
-										<Users size={ 12 } /> Manage Members
+										<Trash2 size={ 13 } />
+										Delete selected
+									</button>
+									<span className="st-todox-bulk-bar__sep" />
+									<button
+										className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--ghost"
+										onClick={ () => setSelectedIds( new Set() ) }
+									>
+										Clear
 									</button>
 								</div>
 							</div>
+						) }
+						<div className="st-todox-table-scroll">
+							<table className="st-todox-table">
+								<thead>
+									<tr>
+										<th style={ { width: 32 } } />
+										<th className="st-todox-table__check-cell">
+											<input
+												type="checkbox"
+												ref={ selectAllRef }
+												checked={ allSelected }
+												onChange={ toggleAll }
+											/>
+										</th>
+										<th style={ { width: '23%' } }>Name</th>
+										<th>Departments</th>
+										<th>Manager</th>
+										<th style={ { width: 90 } }>Members</th>
+										<th style={ { width: 90 } }>Projects</th>
+										<th style={ { width: 110 } } />
+									</tr>
+								</thead>
+								<SortableContext items={ filtered.map( ( t ) => t.id ) } strategy={ verticalListSortingStrategy }>
+									<tbody>
+										{ filtered.map( ( team ) => (
+											<SortableRow
+												key={ team.id }
+												team={ team }
+												checked={ selectedIds.has( team.id ) }
+												onSelect={ toggleSelect }
+												onEdit={ openEdit }
+												onDelete={ setDeleteTarget }
+												onMembers={ ( t ) => { setSelectedTeam( t ); setMemberModalOpen( true ); } }
+											/>
+										) ) }
+									</tbody>
+								</SortableContext>
+							</table>
 						</div>
-					) ) }
-				</div>
-			) }
+						<DragOverlay dropAnimation={ { duration: 160, easing: 'ease' } }>
+							{ activeDrag && (
+								<div className="st-todox-table__drag-overlay">
+									<GripVertical size={ 14 } className="st-todox-table__drag-overlay-grip" />
+									<span className="st-todox-table__drag-overlay-title">{ activeDrag.name }</span>
+								</div>
+							) }
+						</DragOverlay>
+					</DndContext>
+				) }
+			</div>
 
 			{/* Create / Edit Modal */}
 			<Modal
@@ -295,14 +456,14 @@ const TeamsPage = () => {
 							value={ form.name } onChange={ ( e ) => setForm( { ...form, name: e.target.value } ) } autoFocus />
 					</div>
 					<div className="st-todox-form__group">
-						<label className="st-todox-form__label">Department <span className="st-todox-form__required">*</span></label>
-						<select className="st-todox-form__select"
-							value={ form.department_id || '' }
-							onChange={ ( e ) => setForm( { ...form, department_id: Number( e.target.value ) } ) }
-						>
-							<option value="">— Select department —</option>
-							{ departments.map( ( d ) => <option key={ d.id } value={ d.id }>{ d.name }</option> ) }
-						</select>
+						<label className="st-todox-form__label">
+							Departments <span className="st-todox-form__required">*</span>
+						</label>
+						<DepartmentSelector
+							departments={ departments }
+							selectedIds={ form.department_ids ?? [] }
+							onChange={ ( ids ) => setForm( { ...form, department_ids: ids } ) }
+						/>
 					</div>
 					<div className="st-todox-form__group">
 						<label className="st-todox-form__label">Manager</label>
@@ -321,13 +482,7 @@ const TeamsPage = () => {
 					</div>
 					<div className="st-todox-form__group">
 						<label className="st-todox-form__label">Color</label>
-						<div className="st-todox-color-picker">
-							{ COLORS.map( ( c ) => (
-								<button key={ c } type="button"
-									className={ `st-todox-color-picker__swatch ${ form.color === c ? 'st-todox-color-picker__swatch--active' : '' }` }
-									style={ { background: c } } onClick={ () => setForm( { ...form, color: c } ) } />
-							) ) }
-						</div>
+						<ColorPicker colors={ COLORS_ENTITY } value={ form.color } onChange={ ( c ) => setForm( { ...form, color: c } ) } />
 					</div>
 				</form>
 			</Modal>
@@ -345,7 +500,10 @@ const TeamsPage = () => {
 							<Avatar name={ m.name } src={ m.avatar } size={ 32 } />
 							<div className="st-todox-member-row__info">
 								<span className="st-todox-member-row__name">{ m.name }</span>
-								<span className="st-todox-member-row__role">{ m.team_role }</span>
+								<span className="st-todox-member-row__role">
+									{ m.team_role === 'lead' && <Crown size={ 10 } style={ { marginRight: 3 } } /> }
+									{ m.team_role }
+								</span>
 							</div>
 							<button className="st-todox-member-row__remove" onClick={ () => removeMemberMutation.mutate( m.id ) } title="Remove">
 								<Trash2 size={ 13 } />
@@ -380,6 +538,16 @@ const TeamsPage = () => {
 				message={ `Delete "${ deleteTarget?.name }"? This cannot be undone.` }
 				confirmLabel="Delete"
 				loading={ deleteMutation.isPending }
+			/>
+
+			<ConfirmDialog
+				isOpen={ bulkConfirmOpen }
+				onClose={ () => setBulkConfirmOpen( false ) }
+				onConfirm={ () => { setBulkConfirmOpen( false ); bulkDeleteMutation.mutate( [ ...selectedIds ] ); } }
+				title={ `Delete ${ selectedIds.size } Team${ selectedIds.size !== 1 ? 's' : '' }?` }
+				message="This will permanently delete the selected teams. This cannot be undone."
+				confirmLabel="Delete All"
+				loading={ bulkDeleteMutation.isPending }
 			/>
 		</div>
 	);

@@ -19,9 +19,8 @@ import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Spinner from '../../components/ui/Spinner';
 import Avatar from '../../components/ui/Avatar';
+import { ColorPicker, COLORS_WORKSPACE } from '../../components/inputs';
 import type { Workspace, WorkspaceMember, CreateWorkspaceInput, WorkspaceRole } from '../../types';
-
-const COLORS = [ '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#06b6d4' ];
 
 const ROLE_CONFIG: Record< WorkspaceRole, { label: string; className: string } > = {
 	owner:  { label: 'Owner',  className: 'st-todox-role-badge st-todox-role-badge--owner' },
@@ -358,17 +357,7 @@ const WorkspacesPage = () => {
 					</div>
 					<div className="st-todox-form__group">
 						<label className="st-todox-form__label">Color</label>
-						<div className="st-todox-color-picker">
-							{ COLORS.map( ( c ) => (
-								<button
-									key={ c }
-									type="button"
-									className={ `st-todox-color-picker__swatch ${ createForm.color === c ? 'st-todox-color-picker__swatch--active' : '' }` }
-									style={ { background: c } }
-									onClick={ () => setCreateForm( { ...createForm, color: c } ) }
-								/>
-							) ) }
-						</div>
+						<ColorPicker colors={ COLORS_WORKSPACE } value={ createForm.color } onChange={ ( c ) => setCreateForm( { ...createForm, color: c } ) } />
 					</div>
 				</form>
 			</Modal>
@@ -400,17 +389,7 @@ const WorkspacesPage = () => {
 				>
 					<div className="st-todox-form__group">
 						<label className="st-todox-form__label">Color</label>
-						<div className="st-todox-color-picker">
-							{ COLORS.map( ( c ) => (
-								<button
-									key={ c }
-									type="button"
-									className={ `st-todox-color-picker__swatch ${ editForm.color === c ? 'st-todox-color-picker__swatch--active' : '' }` }
-									style={ { background: c } }
-									onClick={ () => setEditForm( { ...editForm, color: c } ) }
-								/>
-							) ) }
-						</div>
+						<ColorPicker colors={ COLORS_WORKSPACE } value={ editForm.color } onChange={ ( c ) => setEditForm( { ...editForm, color: c } ) } />
 					</div>
 					<div className="st-todox-form__group">
 						<label className="st-todox-form__label">Name <span className="st-todox-form__required">*</span></label>

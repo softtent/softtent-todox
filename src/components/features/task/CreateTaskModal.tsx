@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { useState } from '@wordpress/element';
+import { useState, useEffect } from '@wordpress/element';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 
@@ -11,17 +11,19 @@ import { toast } from 'react-toastify';
 import { tasksApi, projectsApi, sprintsApi, usersApi } from '../../../api';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
+import LabelSelector from '../../ui/LabelSelector';
 import { useTaskStatuses } from '../../../hooks/useTaskStatuses';
-import type { Task, TaskStatus, TaskPriority, CreateTaskInput, Sprint, Project } from '../../../types';
+import type { Task, TaskPriority, CreateTaskInput, Sprint, Project } from '../../../types';
 
 interface CreateTaskModalProps {
-	isOpen:          boolean;
-	onClose:         () => void;
-	workspaceId:     number;
-	projectId?:      number;
-	sprintId?:       number;
-	defaultStatus?:  TaskStatus;
-	onCreated?:      ( task: Task ) => void;
+	isOpen:            boolean;
+	onClose:           () => void;
+	workspaceId:       number;
+	projectId?:        number;
+	sprintId?:         number;
+	defaultStatusId?:  number | null;
+	defaultDueDate?:   string | null;
+	onCreated?:        ( task: Task ) => void;
 }
 
 const PRIORITIES: { value: TaskPriority; label: string }[] = [
@@ -34,10 +36,12 @@ const PRIORITIES: { value: TaskPriority; label: string }[] = [
 const initialForm = (): Partial<CreateTaskInput> => ( {
 	title:       '',
 	description: '',
-	status:      'todo',
+	status_id:   null,
 	priority:    'medium',
+	start_date:  null,
 	due_date:    null,
 	assignee_id: null,
+	label_ids:   [],
 } );
 
 const CreateTaskModal = ( {
@@ -46,15 +50,20 @@ const CreateTaskModal = ( {
 	workspaceId,
 	projectId,
 	sprintId,
-	defaultStatus = 'todo',
+	defaultStatusId,
+	defaultDueDate,
 	onCreated,
 }: CreateTaskModalProps ) => {
 	const qc = useQueryClient();
 	const { statuses: taskStatuses } = useTaskStatuses();
-	const [ form, setForm ] = useState<Partial<CreateTaskInput>>( {
-		...initialForm(),
-		status: defaultStatus,
-	} );
+	const [ form, setForm ] = useState<Partial<CreateTaskInput>>( initialForm() );
+
+	useEffect( () => {
+		if ( isOpen ) {
+			const id = defaultStatusId ?? taskStatuses[0]?.id ?? null;
+			setForm( { ...initialForm(), status_id: id, due_date: defaultDueDate ?? null } );
+		}
+	}, [ isOpen, defaultStatusId, defaultDueDate, taskStatuses ] );
 
 	// ── Projects (only when no project is pre-set) ──
 	const { data: projects = [] } = useQuery< Project[] >( {
@@ -121,11 +130,12 @@ const CreateTaskModal = ( {
 	} );
 
 	const handleClose = () => {
-		setForm( { ...initialForm(), status: defaultStatus } );
+		setForm( initialForm() );
 		onClose();
 	};
 
 	const doSubmit = () => {
+		if ( ! workspaceId ) { toast.error( 'No workspace selected.' ); return; }
 		if ( ! form.title?.trim() ) { toast.error( 'Title is required.' ); return; }
 
 		createMutation.mutate( {
@@ -134,10 +144,12 @@ const CreateTaskModal = ( {
 			sprint_id:    sprintId  ?? form.sprint_id ?? null,
 			title:        form.title.trim(),
 			description:  form.description || undefined,
-			status:       form.status,
+			status_id:    form.status_id ?? null,
 			priority:     form.priority,
+			start_date:   form.start_date || null,
 			due_date:     form.due_date || null,
 			assignee_id:  form.assignee_id || null,
+			label_ids:    form.label_ids || [],
 		} );
 	};
 
@@ -203,11 +215,11 @@ const CreateTaskModal = ( {
 						<label className="st-todox-form__label">Status</label>
 						<select
 							className="st-todox-form__select"
-							value={ form.status }
-							onChange={ ( e ) => set( 'status', e.target.value as TaskStatus ) }
+							value={ form.status_id ?? '' }
+							onChange={ ( e ) => set( 'status_id', e.target.value ? Number( e.target.value ) : null ) }
 						>
 							{ taskStatuses.map( ( s ) => (
-								<option key={ s.value } value={ s.value }>{ s.label }</option>
+								<option key={ s.value } value={ s.id ?? '' }>{ s.label }</option>
 							) ) }
 						</select>
 					</div>
@@ -263,20 +275,31 @@ const CreateTaskModal = ( {
 					</div>
 				) }
 
-				{/* Assignee + Due Date */}
+				{/* Assignee */}
+				<div className="st-todox-form__group">
+					<label className="st-todox-form__label">Assignee</label>
+					<select
+						className="st-todox-form__select"
+						value={ form.assignee_id ?? '' }
+						onChange={ ( e ) => set( 'assignee_id', e.target.value ? Number( e.target.value ) : null ) }
+					>
+						<option value="">Unassigned</option>
+						{ users.map( ( u ) => (
+							<option key={ u.id } value={ u.id }>{ u.name }</option>
+						) ) }
+					</select>
+				</div>
+
+				{/* Start Date + Due Date */}
 				<div className="st-todox-form__row">
 					<div className="st-todox-form__group">
-						<label className="st-todox-form__label">Assignee</label>
-						<select
-							className="st-todox-form__select"
-							value={ form.assignee_id ?? '' }
-							onChange={ ( e ) => set( 'assignee_id', e.target.value ? Number( e.target.value ) : null ) }
-						>
-							<option value="">Unassigned</option>
-							{ users.map( ( u ) => (
-								<option key={ u.id } value={ u.id }>{ u.name }</option>
-							) ) }
-						</select>
+						<label className="st-todox-form__label">Start Date</label>
+						<input
+							type="date"
+							className="st-todox-form__input"
+							value={ form.start_date ?? '' }
+							onChange={ ( e ) => set( 'start_date', e.target.value || null ) }
+						/>
 					</div>
 					<div className="st-todox-form__group">
 						<label className="st-todox-form__label">Due Date</label>
@@ -288,6 +311,19 @@ const CreateTaskModal = ( {
 						/>
 					</div>
 				</div>
+
+				{/* Labels */}
+				{ workspaceId && (
+					<div className="st-todox-form__group">
+						<label className="st-todox-form__label">Labels</label>
+						<LabelSelector
+							workspaceId={ workspaceId }
+							labelType="task_label"
+							selectedIds={ form.label_ids || [] }
+							onChange={ ( ids ) => set( 'label_ids', ids ) }
+						/>
+					</div>
+				) }
 
 			</form>
 		</Modal>

@@ -1,9 +1,9 @@
 /**
  * External dependencies
  */
-import { useState, useEffect, useRef } from '@wordpress/element';
+import { useState, useEffect, useRef, useMemo } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
 	DndContext,
@@ -24,20 +24,21 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
 	CheckSquare,
-	Kanban,
 	Plus,
 	AlertCircle,
 	Calendar,
 	Trash2,
 	Search,
 	ChevronRight,
+	ChevronDown,
 	GripVertical,
+	Pencil,
 } from 'lucide-react';
 
 /**
  * Internal dependencies
  */
-import { tasksApi } from '../../api';
+import { tasksApi, usersApi } from '../../api';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useTaskStatuses } from '../../hooks/useTaskStatuses';
@@ -49,35 +50,45 @@ import Avatar from '../../components/ui/Avatar';
 import Spinner from '../../components/ui/Spinner';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import CreateTaskModal from '../../components/features/task/CreateTaskModal';
+import InlineTaskInput from '../../components/features/task/InlineTaskInput';
+import TaskDetailModal from '../../components/features/task/TaskDetailModal';
+import ViewSwitcher from '../../components/features/task/ViewSwitcher';
 import { formatDate, isOverdue } from '../../utils/helpers';
-import type { Task, TaskPriority, TaskStatus } from '../../types';
+import type { Task, TaskPriority, TaskStatus, User } from '../../types';
 
-/* ---- Inline subtask progress ---- */
-const SubtaskCell = ( { task }: { task: Task } ) => {
-	const total = task.subtasks?.length ?? 0;
-	if ( total === 0 ) return <span className="st-todox-text--muted">—</span>;
-	const done = task.subtasks!.filter( ( s ) => s.completed ).length;
-	const pct  = Math.round( ( done / total ) * 100 );
-	return (
-		<div className="st-todox-table__subtasks">
-			<div className="st-todox-table__subtask-bar">
-				<div className="st-todox-table__subtask-fill" style={ { width: `${ pct }%` } } />
-			</div>
-			<span>{ done }/{ total }</span>
-		</div>
-	);
-};
+type TaskStatusOption = { value: string; label: string; color: string; id: number | null };
 
 /* ---- Sortable Task Row ---- */
 const SortableTaskRow = ( {
 	task,
+	checked,
+	taskStatuses,
+	users,
+	onSelect,
 	onNavigate,
 	onDelete,
+	onStatusChange,
+	onPriorityChange,
+	onAssigneeChange,
+	onDueDateChange,
 }: {
-	task: Task;
-	onNavigate: ( id: number ) => void;
-	onDelete: ( id: number ) => void;
+	task:             Task;
+	checked:          boolean;
+	taskStatuses:     TaskStatusOption[];
+	users:            User[];
+	onSelect:         ( id: number ) => void;
+	onNavigate:       ( id: number ) => void;
+	onDelete:         ( id: number ) => void;
+	onStatusChange:   ( id: number, status: TaskStatus ) => void;
+	onPriorityChange: ( id: number, priority: TaskPriority ) => void;
+	onAssigneeChange: ( id: number, assigneeId: number | null ) => void;
+	onDueDateChange:  ( id: number, dueDate: string | null ) => void;
 } ) => {
+	const [ statusOpen, setStatusOpen ]       = useState( false );
+	const [ priorityOpen, setPriorityOpen ]   = useState( false );
+	const [ assigneeOpen, setAssigneeOpen ]   = useState( false );
+	const [ dueDateEditing, setDueDateEditing ] = useState( false );
+
 	const {
 		attributes,
 		listeners,
@@ -102,7 +113,7 @@ const SortableTaskRow = ( {
 			ref={ setNodeRef }
 			style={ style }
 			{ ...attributes }
-			className={ `st-todox-table__row ${ overdue ? 'st-todox-table__row--overdue' : '' } ${ isDragging ? 'st-todox-table__row--dragging' : '' }` }
+			className={ `st-todox-table__row ${ overdue ? 'st-todox-table__row--overdue' : '' } ${ isDragging ? 'st-todox-table__row--dragging' : '' } ${ checked ? 'st-todox-table__row--selected' : '' }` }
 			onClick={ () => onNavigate( task.id ) }
 		>
 			{/* Drag handle */}
@@ -113,6 +124,11 @@ const SortableTaskRow = ( {
 				<span className="st-todox-table__drag-handle" { ...listeners }>
 					<GripVertical size={ 14 } />
 				</span>
+			</td>
+
+			{/* Checkbox */}
+			<td className="st-todox-table__check-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<input type="checkbox" checked={ checked } onChange={ () => onSelect( task.id ) } />
 			</td>
 
 			{/* Title + labels */}
@@ -133,33 +149,144 @@ const SortableTaskRow = ( {
 				) }
 			</td>
 
-			<td><StatusBadge status={ task.status } /></td>
-
-			<td><PriorityBadge priority={ task.priority } /></td>
-
-			<td>
-				{ task.assignee ? (
-					<div className="st-todox-assignee">
-						<Avatar name={ task.assignee.name } src={ task.assignee.avatar } size={ 22 } />
-						<span className="st-todox-assignee__name">{ task.assignee.name }</span>
-					</div>
-				) : (
-					<span className="st-todox-text--muted">—</span>
-				) }
+			{/* Status inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				<div className="st-todox-inline-picker">
+					<button
+						className="st-todox-inline-picker__trigger"
+						onClick={ () => setStatusOpen( ( v ) => ! v ) }
+						title="Change status"
+					>
+						<StatusBadge status={ task.status } />
+						<ChevronDown size={ 10 } className="st-todox-inline-picker__chevron" />
+					</button>
+					{ statusOpen && (
+						<>
+							<div className="st-todox-inline-picker__backdrop" onClick={ () => setStatusOpen( false ) } />
+							<div className="st-todox-inline-picker__menu">
+								{ taskStatuses.map( ( s ) => (
+									<button
+										key={ s.value }
+										className={ `st-todox-inline-picker__item ${ task.status === s.value ? 'st-todox-inline-picker__item--active' : '' }` }
+										onClick={ () => { onStatusChange( task.id, s.value as TaskStatus ); setStatusOpen( false ); } }
+									>
+										<StatusBadge status={ s.value as TaskStatus } />
+									</button>
+								) ) }
+							</div>
+						</>
+					) }
+				</div>
 			</td>
 
-			<td>
-				{ task.due_date ? (
-					<span className={ `st-todox-table__due ${ overdue ? 'st-todox-table__due--overdue' : '' }` }>
-						<Calendar size={ 12 } />
-						{ formatDate( task.due_date ) }
-					</span>
-				) : (
-					<span className="st-todox-text--muted">—</span>
-				) }
+			{/* Priority inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				<div className="st-todox-inline-picker">
+					<button
+						className="st-todox-inline-picker__trigger"
+						onClick={ () => setPriorityOpen( ( v ) => ! v ) }
+						title="Change priority"
+					>
+						<PriorityBadge priority={ task.priority } />
+						<ChevronDown size={ 10 } className="st-todox-inline-picker__chevron" />
+					</button>
+					{ priorityOpen && (
+						<>
+							<div className="st-todox-inline-picker__backdrop" onClick={ () => setPriorityOpen( false ) } />
+							<div className="st-todox-inline-picker__menu">
+								{ ( [ 'low', 'medium', 'high', 'urgent' ] as TaskPriority[] ).map( ( p ) => (
+									<button
+										key={ p }
+										className={ `st-todox-inline-picker__item ${ task.priority === p ? 'st-todox-inline-picker__item--active' : '' }` }
+										onClick={ () => { onPriorityChange( task.id, p ); setPriorityOpen( false ); } }
+									>
+										<PriorityBadge priority={ p } />
+									</button>
+								) ) }
+							</div>
+						</>
+					) }
+				</div>
 			</td>
 
-			<td><SubtaskCell task={ task } /></td>
+			{/* Assignee inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				<div className="st-todox-inline-picker">
+					<button
+						className="st-todox-inline-picker__trigger"
+						onClick={ () => setAssigneeOpen( ( v ) => ! v ) }
+						title="Change assignee"
+					>
+						{ task.assignee ? (
+							<div className="st-todox-assignee">
+								<Avatar name={ task.assignee.name } src={ task.assignee.avatar } size={ 18 } />
+								<span className="st-todox-assignee__name">{ task.assignee.name }</span>
+							</div>
+						) : (
+							<span className="st-todox-text--muted">—</span>
+						) }
+						<ChevronDown size={ 10 } className="st-todox-inline-picker__chevron" />
+					</button>
+					{ assigneeOpen && (
+						<>
+							<div className="st-todox-inline-picker__backdrop" onClick={ () => setAssigneeOpen( false ) } />
+							<div className="st-todox-inline-picker__menu">
+								<button
+									className={ `st-todox-inline-picker__item ${ ! task.assignee_id ? 'st-todox-inline-picker__item--active' : '' }` }
+									onClick={ () => { onAssigneeChange( task.id, null ); setAssigneeOpen( false ); } }
+								>
+									<span style={ { width: 16, height: 16, borderRadius: '50%', border: '1.5px dashed #94a3b8', display: 'inline-block', flexShrink: 0 } } />
+									Unassigned
+								</button>
+								{ users.map( ( u ) => (
+									<button
+										key={ u.id }
+										className={ `st-todox-inline-picker__item ${ task.assignee_id === u.id ? 'st-todox-inline-picker__item--active' : '' }` }
+										onClick={ () => { onAssigneeChange( task.id, u.id ); setAssigneeOpen( false ); } }
+									>
+										<Avatar name={ u.name } src={ u.avatar } size={ 16 } />
+										{ u.name }
+									</button>
+								) ) }
+							</div>
+						</>
+					) }
+				</div>
+			</td>
+
+			{/* Due date inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				{ dueDateEditing ? (
+					<input
+						type="date"
+						className="st-todox-form__input st-todox-td-meta-date-input"
+						defaultValue={ task.due_date ?? '' }
+						autoFocus
+						onChange={ ( e ) => {
+							onDueDateChange( task.id, e.target.value || null );
+							setDueDateEditing( false );
+						} }
+						onBlur={ () => setDueDateEditing( false ) }
+						onKeyDown={ ( e ) => { if ( e.key === 'Escape' ) setDueDateEditing( false ); } }
+					/>
+				) : (
+					<button
+						className="st-todox-inline-picker__trigger"
+						onClick={ () => setDueDateEditing( true ) }
+						title="Set due date"
+					>
+						{ task.due_date ? (
+							<span className={ `st-todox-table__due ${ overdue ? 'st-todox-table__due--overdue' : '' }` }>
+								<Calendar size={ 12 } />
+								{ formatDate( task.due_date ) }
+							</span>
+						) : (
+							<span className="st-todox-text--muted">—</span>
+						) }
+						<Pencil size={ 10 } className="st-todox-inline-picker__chevron" />
+					</button>
+				) }
+			</td>
 
 			{/* Row actions */}
 			<td
@@ -192,14 +319,14 @@ const DragOverlayRow = ( { task }: { task: Task } ) => (
 );
 
 const TasksPage = () => {
-	const navigate         = useNavigate();
 	const [ searchParams ] = useSearchParams();
 	const qc               = useQueryClient();
 	const { activeWorkspaceId, activeWorkspace } = useWorkspace();
 	const { statuses: taskStatuses } = useTaskStatuses();
 
-	const [ createOpen, setCreateOpen ]       = useState( false );
-	const [ deleteId, setDeleteId ]           = useState<number | null>( null );
+	const [ createOpen, setCreateOpen ] = useState( false );
+	const [ deleteId, setDeleteId ]               = useState<number | null>( null );
+	const [ selectedTaskId, setSelectedTaskId ]   = useState<number | null>( null );
 	const [ search, setSearch ]               = useState( searchParams.get( 'search' ) ?? '' );
 	const [ activeFilter, setFilter ]         = useState<TaskStatus | null>(
 		( searchParams.get( 'status' ) as TaskStatus ) ?? null
@@ -207,10 +334,13 @@ const TasksPage = () => {
 	const [ priorityFilter, setPriority ]     = useState<TaskPriority | ''>( '' );
 	const [ orderedTasks, setOrderedTasks ]   = useState<Task[]>( [] );
 	const [ activeTask, setActiveTask ]       = useState<Task | null>( null );
+	const [ selectedIds, setSelectedIds ]     = useState< Set<number> >( new Set() );
+	const [ bulkConfirmOpen, setBulkConfirmOpen ] = useState( false );
+	const selectAllRef                        = useRef< HTMLInputElement >( null );
 
 	const debouncedSearch = useDebounce( search, 400 );
 
-	const { data, isLoading } = useQuery( {
+	const { data, isLoading, isError, error } = useQuery( {
 		queryKey: [ 'tasks', activeWorkspaceId, debouncedSearch, activeFilter, priorityFilter ],
 		queryFn:  () => tasksApi.getAll( {
 			workspace_id: activeWorkspaceId!,
@@ -235,6 +365,13 @@ const TasksPage = () => {
 		enabled:  !! activeWorkspaceId,
 		staleTime: 30_000,
 	} );
+
+	const { data: usersData } = useQuery( {
+		queryKey: [ 'users' ],
+		queryFn:  () => usersApi.getAll( { per_page: 100 } ),
+		staleTime: 60_000,
+	} );
+	const users = usersData?.items ?? [];
 	const allTasks      = countData?.items ?? [];
 	const countByStatus = ( f: string | null ) =>
 		f ? allTasks.filter( ( t: Task ) => t.status === f ).length : allTasks.length;
@@ -242,12 +379,60 @@ const TasksPage = () => {
 		( t: Task ) => isOverdue( t.due_date ) && t.status !== 'completed'
 	).length;
 
+	const allSelected  = useMemo(
+		() => orderedTasks.length > 0 && orderedTasks.every( ( t ) => selectedIds.has( t.id ) ),
+		[ orderedTasks, selectedIds ]
+	);
+	const someSelected = useMemo(
+		() => ! allSelected && orderedTasks.some( ( t ) => selectedIds.has( t.id ) ),
+		[ orderedTasks, selectedIds, allSelected ]
+	);
+
+	useEffect( () => {
+		if ( selectAllRef.current ) selectAllRef.current.indeterminate = someSelected;
+	}, [ someSelected ] );
+
+	const toggleSelect = ( id: number ) =>
+		setSelectedIds( ( prev ) => { const s = new Set( prev ); s.has( id ) ? s.delete( id ) : s.add( id ); return s; } );
+
+	const toggleAll = () =>
+		setSelectedIds( allSelected ? new Set() : new Set( orderedTasks.map( ( t ) => t.id ) ) );
+
 	const deleteMutation = useMutation( {
 		mutationFn: ( id: number ) => tasksApi.delete( id ),
 		onSuccess:  () => {
 			qc.invalidateQueries( { queryKey: [ 'tasks' ] } );
 			toast.success( 'Task deleted.' );
 			setDeleteId( null );
+		},
+		onError: ( err: Error ) => toast.error( err.message ),
+	} );
+
+	const updateMutation = useMutation( {
+		mutationFn: ( { id, data }: { id: number; data: Partial<Task> } ) =>
+			tasksApi.update( id, data ),
+		onSuccess: () => qc.invalidateQueries( { queryKey: [ 'tasks' ] } ),
+		onError:   ( err: Error ) => toast.error( err.message ),
+	} );
+
+	const handleStatusChange = ( id: number, status: TaskStatus ) =>
+		updateMutation.mutate( { id, data: { status } } );
+
+	const handlePriorityChange = ( id: number, priority: TaskPriority ) =>
+		updateMutation.mutate( { id, data: { priority } } );
+
+	const handleAssigneeChange = ( id: number, assigneeId: number | null ) =>
+		updateMutation.mutate( { id, data: { assignee_id: assigneeId } as Partial<Task> } );
+
+	const handleDueDateChange = ( id: number, dueDate: string | null ) =>
+		updateMutation.mutate( { id, data: { due_date: dueDate } as Partial<Task> } );
+
+	const bulkDeleteMutation = useMutation( {
+		mutationFn: ( ids: number[] ) => Promise.all( ids.map( ( id ) => tasksApi.delete( id ) ) ),
+		onSuccess:  () => {
+			qc.invalidateQueries( { queryKey: [ 'tasks' ] } );
+			setSelectedIds( new Set() );
+			toast.success( 'Tasks deleted.' );
 		},
 		onError: ( err: Error ) => toast.error( err.message ),
 	} );
@@ -299,9 +484,7 @@ const TasksPage = () => {
 				description={ `${ activeWorkspace?.name } · ${ total } task${ total !== 1 ? 's' : '' }${ search ? ` matching "${ search }"` : '' }` }
 				actions={
 					<div className="st-todox-page-header__btn-group">
-						<Button variant="secondary" onClick={ () => navigate( '/tasks/kanban' ) } leftIcon={ <Kanban size={ 14 } /> }>
-							Kanban
-						</Button>
+						<ViewSwitcher />
 						<Button onClick={ () => setCreateOpen( true ) } leftIcon={ <Plus size={ 14 } /> }>
 							New Task
 						</Button>
@@ -383,9 +566,36 @@ const TasksPage = () => {
 					</div>
 				</div>
 
+				{ selectedIds.size > 0 && (
+					<div className="st-todox-bulk-bar">
+						<span className="st-todox-bulk-bar__count">{ selectedIds.size } task{ selectedIds.size !== 1 ? 's' : '' } selected</span>
+						<div className="st-todox-bulk-bar__actions">
+							<button
+								className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--danger"
+								onClick={ () => setBulkConfirmOpen( true ) }
+							>
+								<Trash2 size={ 13 } />
+								Delete selected
+							</button>
+							<span className="st-todox-bulk-bar__sep" />
+							<button
+								className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--ghost"
+								onClick={ () => setSelectedIds( new Set() ) }
+							>
+								Clear
+							</button>
+						</div>
+					</div>
+				) }
+
 				{/* Body */}
 				{ isLoading ? (
-					<div className="st-todox-surface-card__body"><Spinner /></div>
+					<div className="st-todox-page-loader"><Spinner /></div>
+				) : isError ? (
+					<div className="st-todox-empty-inline st-todox-empty-inline--error">
+						<AlertCircle size={ 36 } strokeWidth={ 1.5 } style={ { opacity: 0.5, color: '#ef4444' } } />
+						<p>{ ( error as Error )?.message ?? 'Failed to load tasks.' }</p>
+					</div>
 				) : orderedTasks.length === 0 ? (
 					<div className="st-todox-empty-inline">
 						<CheckSquare size={ 36 } strokeWidth={ 1.5 } style={ { opacity: 0.3 } } />
@@ -408,12 +618,19 @@ const TasksPage = () => {
 								<thead>
 									<tr>
 										<th style={ { width: 32 } } />
-										<th style={ { width: '38%' } }>Title</th>
+										<th className="st-todox-table__check-cell">
+											<input
+												type="checkbox"
+												ref={ selectAllRef }
+												checked={ allSelected }
+												onChange={ toggleAll }
+											/>
+										</th>
+										<th style={ { width: '35%' } }>Title</th>
 										<th>Status</th>
 										<th>Priority</th>
 										<th>Assignee</th>
 										<th>Due Date</th>
-										<th>Subtasks</th>
 										<th style={ { width: 40 } } />
 									</tr>
 								</thead>
@@ -423,14 +640,36 @@ const TasksPage = () => {
 											<SortableTaskRow
 												key={ task.id }
 												task={ task }
-												onNavigate={ ( id ) => navigate( `/tasks/${ id }` ) }
+												checked={ selectedIds.has( task.id ) }
+												taskStatuses={ taskStatuses }
+												users={ users }
+												onSelect={ toggleSelect }
+												onNavigate={ ( id ) => setSelectedTaskId( id ) }
 												onDelete={ ( id ) => setDeleteId( id ) }
+												onStatusChange={ handleStatusChange }
+												onPriorityChange={ handlePriorityChange }
+												onAssigneeChange={ handleAssigneeChange }
+												onDueDateChange={ handleDueDateChange }
 											/>
 										) ) }
 									</tbody>
 								</SortableContext>
 							</table>
 						</div>
+
+						{ ( () => {
+							const activeStatus = activeFilter
+								? taskStatuses.find( ( s ) => s.value === activeFilter )
+								: taskStatuses[ 0 ];
+							return (
+								<InlineTaskInput
+									key={ activeFilter ?? '__all' }
+									statusValue={ activeStatus?.value ?? '' }
+									statusId={ activeStatus?.id ?? null }
+									onCreated={ () => qc.invalidateQueries( { queryKey: [ 'tasks' ] } ) }
+								/>
+							);
+						} )() }
 
 						<DragOverlay dropAnimation={ { duration: 160, easing: 'ease' } }>
 							{ activeTask && <DragOverlayRow task={ activeTask } /> }
@@ -450,10 +689,24 @@ const TasksPage = () => {
 				title="Delete Task"
 				message="Are you sure you want to delete this task? This cannot be undone."
 				confirmLabel="Delete"
-				variant="danger"
 				loading={ deleteMutation.isPending }
 				onConfirm={ () => deleteId !== null && deleteMutation.mutate( deleteId ) }
 				onClose={ () => setDeleteId( null ) }
+			/>
+
+			<ConfirmDialog
+				isOpen={ bulkConfirmOpen }
+				onClose={ () => setBulkConfirmOpen( false ) }
+				onConfirm={ () => { setBulkConfirmOpen( false ); bulkDeleteMutation.mutate( [ ...selectedIds ] ); } }
+				title={ `Delete ${ selectedIds.size } Task${ selectedIds.size !== 1 ? 's' : '' }?` }
+				message="This will permanently delete the selected tasks. This cannot be undone."
+				confirmLabel="Delete All"
+				loading={ bulkDeleteMutation.isPending }
+			/>
+
+			<TaskDetailModal
+				taskId={ selectedTaskId }
+				onClose={ () => setSelectedTaskId( null ) }
 			/>
 		</div>
 	);

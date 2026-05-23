@@ -22,11 +22,18 @@ const SprintDetail    = lazy( () => import( '../pages/sprints/SprintDetail' ) );
 const TasksPage       = lazy( () => import( '../pages/tasks' ) );
 const TaskDetail      = lazy( () => import( '../pages/tasks/TaskDetail' ) );
 const KanbanPage      = lazy( () => import( '../pages/tasks/KanbanPage' ) );
+const CalendarPage    = lazy( () => import( '../pages/tasks/CalendarPage' ) );
+const ListPage        = lazy( () => import( '../pages/tasks/ListPage' ) );
 const NotificationsPage = lazy( () => import( '../pages/notifications' ) );
 const SettingsPage    = lazy( () => import( '../pages/settings' ) );
 const NotFound        = lazy( () => import( '../pages/404' ) );
+const WelcomePage     = lazy( () => import( '../pages/welcome' ) );
 
 export const router = createHashRouter( [
+	{
+		path: '/welcome',
+		element: <WelcomePage />,
+	},
 	{
 		path: '/',
 		element: <AppLayout />,
@@ -42,6 +49,8 @@ export const router = createHashRouter( [
 			{ path: 'sprints/:id', element: <SprintDetail /> },
 			{ path: 'tasks', element: <TasksPage /> },
 			{ path: 'tasks/kanban', element: <KanbanPage /> },
+			{ path: 'tasks/calendar', element: <CalendarPage /> },
+			{ path: 'tasks/list', element: <ListPage /> },
 			{ path: 'tasks/:id', element: <TaskDetail /> },
 			{ path: 'notifications', element: <NotificationsPage /> },
 			{ path: 'settings', element: <SettingsPage /> },

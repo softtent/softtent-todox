@@ -113,7 +113,7 @@ const ProjectDetail = () => {
 
 	// ── Data ──
 	const { data: project, isLoading: projectLoading } = useQuery( {
-		queryKey: [ 'projects', projectId ],
+		queryKey: [ 'project', projectId ],
 		queryFn:  () => projectsApi.getOne( projectId ),
 		enabled:  !! projectId,
 	} );
@@ -135,7 +135,7 @@ const ProjectDetail = () => {
 
 	// ── Invalidate helpers ──
 	const invalidateSprints  = () => qc.invalidateQueries( { queryKey: [ 'sprints', projectId ] } );
-	const invalidateProject  = () => qc.invalidateQueries( { queryKey: [ 'projects', projectId ] } );
+	const invalidateProject  = () => qc.invalidateQueries( { queryKey: [ 'project', projectId ] } );
 
 	// ── Mutations ──
 	const projectStatusMutation = useMutation( {

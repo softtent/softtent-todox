@@ -38,6 +38,16 @@ class SubtaskController extends RestApi {
         );
 
 		register_rest_route(
+			$this->namespace, '/' . $this->base . '/(?P<task_id>\d+)/subtasks/reorder', [
+				[
+					'methods'             => 'POST',
+					'callback'            => [ $this, 'reorder' ],
+					'permission_callback' => [ $this, 'is_workspace_member' ],
+				],
+			]
+		);
+
+		register_rest_route(
             $this->namespace, '/' . $this->base . '/(?P<task_id>\d+)/subtasks/(?P<id>\d+)', [
 				[
 					'methods' => 'GET',
@@ -91,6 +101,18 @@ class SubtaskController extends RestApi {
 		Subtask::update( $id, $req->get_params() );
 
 		return $this->ok( Subtask::get( $id ), esc_html__( 'Subtask updated.', 'softtent-todox' ) );
+	}
+
+	public function reorder( \WP_REST_Request $req ): \WP_REST_Response {
+		$items = $req->get_param( 'items' );
+
+		if ( ! is_array( $items ) || empty( $items ) ) {
+			return $this->error( esc_html__( 'Items array is required.', 'softtent-todox' ) );
+		}
+
+		Subtask::reorder( $items );
+
+		return $this->ok( null, esc_html__( 'Subtasks reordered.', 'softtent-todox' ) );
 	}
 
 	public function destroy( \WP_REST_Request $req ): \WP_REST_Response {

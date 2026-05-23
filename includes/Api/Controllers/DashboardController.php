@@ -7,7 +7,6 @@ defined( 'ABSPATH' ) || exit;
 use SoftTent\TodoX\Abstracts\RestApi;
 use SoftTent\TodoX\Models\Task;
 use SoftTent\TodoX\Models\Project;
-use SoftTent\TodoX\Models\Sprint;
 use SoftTent\TodoX\Helpers\Fns;
 
 /**
@@ -60,7 +59,7 @@ class DashboardController extends RestApi {
 
 		$task_stats = Task::get_stats( $workspace_id );
 
-		$projects_count = count( Project::get_all( $workspace_id ) );
+		$projects_count = Project::count( $workspace_id );
 
 		return $this->ok(
             [
@@ -88,7 +87,7 @@ class DashboardController extends RestApi {
         );
 
 		foreach ( $result['items'] as &$task ) {
-			$task['labels'] = Task::get_labels( $task['id'] );
+			$task['labels'] = Task::resolve_labels( $task['label_ids'] ?? [] );
 		}
 		unset( $task );
 

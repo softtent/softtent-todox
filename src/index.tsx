@@ -13,9 +13,7 @@ import './styles/main.scss';
 
 // Apply saved theme before React renders to prevent flash.
 try {
-	const saved = localStorage.getItem( 'st-todox-theme' );
-	const prefersDark = window.matchMedia( '(prefers-color-scheme: dark)' ).matches;
-	if ( saved === 'dark' || ( ! saved && prefersDark ) ) {
+	if ( localStorage.getItem( 'st-todox-theme' ) === 'dark' ) {
 		document.documentElement.classList.add( 'dark' );
 	}
 } catch {}

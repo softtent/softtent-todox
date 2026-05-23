@@ -71,6 +71,9 @@ class TaxonomyController extends RestApi {
 		return $this->ok( Taxonomy::get_all( $workspace_id, $req->get_param( 'type' ) ) );
 	}
 
+	/** Allowed taxonomy types. */
+	private const ALLOWED_TYPES = [ 'task_status', 'sprint_status', 'project_status', 'subtask_status', 'task_label', 'subtask_label', 'project_label' ];
+
 	public function store( \WP_REST_Request $req ): \WP_REST_Response {
 		$name = $this->sanitize_text( $req->get_param( 'name' ) ?? '' );
 
@@ -78,7 +81,33 @@ class TaxonomyController extends RestApi {
 			return $this->error( esc_html__( 'Taxonomy name is required.', 'softtent-todox' ) );
 		}
 
-		$id = Taxonomy::create( array_merge( $req->get_params(), [ 'name' => $name ] ) );
+		$type = $this->sanitize_text( $req->get_param( 'type' ) ?? '' );
+
+		if ( ! in_array( $type, self::ALLOWED_TYPES, true ) ) {
+			return $this->error( esc_html__( 'Invalid taxonomy type.', 'softtent-todox' ) );
+		}
+
+		$is_global    = (bool) $req->get_param( 'is_global' );
+		$workspace_id = null;
+
+		if ( ! $is_global ) {
+			$workspace_id = (int) $req->get_param( 'workspace_id' );
+			if ( ! $workspace_id ) {
+				return $this->error( esc_html__( 'workspace_id is required for workspace-scoped taxonomies.', 'softtent-todox' ) );
+			}
+		}
+
+		$id = Taxonomy::create(
+            [
+				'name'         => $name,
+				'type'         => $type,
+				'is_global'    => $is_global,
+				'workspace_id' => $is_global ? null : $workspace_id,
+				'color'        => $req->get_param( 'color' ) ?? '#6366f1',
+				'icon'         => $req->get_param( 'icon' ) ?? null,
+				'slug'         => $req->get_param( 'slug' ) ?? '',
+			]
+        );
 
 		return $id
 			? $this->ok( Taxonomy::get( $id ), esc_html__( 'Taxonomy created.', 'softtent-todox' ), 201 )

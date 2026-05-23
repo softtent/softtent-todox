@@ -73,7 +73,7 @@ export interface Department {
 
 export interface Team {
 	id: number;
-	department_id: number;
+	department_ids: number[];
 	workspace_id: number;
 	name: string;
 	description: string | null;
@@ -81,7 +81,7 @@ export interface Team {
 	avatar: string | null;
 	manager_id: number | null;
 	manager: User | null;
-	department: { id: number; name: string; color: string };
+	departments: { id: number; name: string; color: string }[];
 	members?: TeamMember[];
 	members_count?: number;
 	projects_count?: number;
@@ -100,10 +100,11 @@ export interface TeamMember extends User {
 
 export interface Taxonomy {
 	id: number;
-	workspace_id: number;
+	workspace_id: number | null;
+	is_global: boolean;
 	name: string;
 	type: string;
-	category: string | null;
+	slug: string | null;
 	color: string;
 	icon: string | null;
 	position: number;
@@ -116,24 +117,26 @@ export interface Taxonomy {
 // Project
 // ============================================
 
+export interface ProjectTeam {
+	id: number;
+	name: string;
+	color: string;
+	department: { name: string };
+}
+
 export interface Project {
 	id: number;
-	team_id: number;
+	team_ids: number[];
 	workspace_id: number;
 	name: string;
 	description: string | null;
 	color: string;
 	icon: string | null;
-	status: ProjectStatus;
-	taxonomy_id: number | null;
+	status_id: number | null;
+	status: string;
 	owner_id: number;
 	owner: User;
-	team: {
-		id: number;
-		name: string;
-		color: string;
-		department: { name: string };
-	};
+	teams: ProjectTeam[];
 	sprints_count?: number;
 	created_at: string;
 	updated_at: string;
@@ -148,8 +151,8 @@ export interface Sprint {
 	project_id: number;
 	name: string;
 	goal: string | null;
-	status: SprintStatus;
-	taxonomy_id: number | null;
+	status_id: number | null;
+	status: string;
 	start_date: string | null;
 	end_date: string | null;
 	project: { id: number; name: string; color: string };
@@ -175,9 +178,10 @@ export interface Task {
 	workspace_id: number | null;
 	title: string;
 	description: string | null;
-	status: TaskStatus;
-	taxonomy_id: number | null;
+	status_id: number | null;
+	status: string;
 	priority: TaskPriority;
+	start_date: string | null;
 	due_date: string | null;
 	position: number;
 	is_archived: boolean;
@@ -185,7 +189,9 @@ export interface Task {
 	assignee: User | null;
 	creator_id: number;
 	creator: User;
+	label_ids: number[];
 	labels: TaskLabel[];
+	subtask_counts?: { total: number; completed: number };
 	subtasks?: Subtask[];
 	comments?: TaskComment[];
 	activities?: TaskActivity[];
@@ -223,14 +229,16 @@ export interface Subtask {
 	task_id: number;
 	title: string;
 	description: string | null;
-	status: SubtaskStatus;
-	taxonomy_id: number | null;
+	status_id: number | null;
+	status: string;
 	priority: TaskPriority;
+	start_date: string | null;
 	due_date: string | null;
 	completed: boolean;
 	position: number;
 	assignee_id: number | null;
 	assignee: User | null;
+	label_ids: number[];
 	labels: TaskLabel[];
 	created_at: string;
 	updated_at: string;
@@ -329,7 +337,7 @@ export interface CreateDepartmentInput {
 
 export interface CreateTeamInput {
 	workspace_id: number;
-	department_id: number;
+	department_ids: number[];
 	name: string;
 	description?: string;
 	color?: string;
@@ -338,10 +346,11 @@ export interface CreateTeamInput {
 
 export interface CreateProjectInput {
 	workspace_id: number;
-	team_id: number;
+	team_ids: number[];
 	name: string;
 	description?: string;
 	color?: string;
+	label_ids?: number[];
 }
 
 export interface CreateSprintInput {
@@ -358,18 +367,23 @@ export interface CreateTaskInput {
 	sprint_id?: number | null;
 	title: string;
 	description?: string;
-	status?: TaskStatus;
+	status?: string;
+	status_id?: number | null;
 	priority?: TaskPriority;
+	start_date?: string | null;
 	due_date?: string | null;
 	assignee_id?: number | null;
-	labels?: { name: string; color: string }[];
+	label_ids?: number[];
 }
 
 export interface CreateSubtaskInput {
 	title: string;
 	description?: string;
-	status?: SubtaskStatus;
+	status?: string;
+	status_id?: number | null;
 	priority?: TaskPriority;
+	start_date?: string | null;
 	due_date?: string | null;
 	assignee_id?: number | null;
+	label_ids?: number[];
 }

@@ -18,6 +18,7 @@ export const departmentsApi = {
 	create: ( data: CreateDepartmentInput ) => api.post< Department >( 'departments', data ),
 	update: ( id: number, data: Partial< CreateDepartmentInput > ) => api.put< Department >( `departments/${ id }`, data ),
 	delete: ( id: number ) => api.delete( `departments/${ id }` ),
+	reorder: ( items: { id: number; position: number }[] ) => api.post( 'departments/reorder', { items } ),
 };
 
 // ---- Teams ----
@@ -33,6 +34,7 @@ export const teamsApi = {
 		api.post< TeamMember[] >( `teams/${ id }/members`, { user_id: userId, role } ),
 	removeMember: ( id: number, userId: number ) =>
 		api.delete( `teams/${ id }/members/${ userId }` ),
+	reorder: ( items: { id: number; position: number }[] ) => api.post( 'teams/reorder', { items } ),
 };
 
 // ---- Projects ----
@@ -44,6 +46,7 @@ export const projectsApi = {
 	update: ( id: number, data: Partial< CreateProjectInput > & { status?: string } ) =>
 		api.put< Project >( `projects/${ id }`, data ),
 	delete: ( id: number ) => api.delete( `projects/${ id }` ),
+	reorder: ( items: { id: number; position: number }[] ) => api.post( 'projects/reorder', { items } ),
 };
 
 // ---- Sprints ----
@@ -55,6 +58,7 @@ export const sprintsApi = {
 	update: ( id: number, data: Partial< CreateSprintInput > & { status?: string } ) =>
 		api.put< Sprint >( `sprints/${ id }`, data ),
 	delete: ( id: number ) => api.delete( `sprints/${ id }` ),
+	reorder: ( items: { id: number; position: number }[] ) => api.post( 'sprints/reorder', { items } ),
 };
 
 // ---- Subtasks ----
@@ -66,15 +70,17 @@ export const subtasksApi = {
 		api.put< Subtask >( `tasks/${ taskId }/subtasks/${ id }`, data ),
 	delete: ( taskId: number, id: number ) =>
 		api.delete( `tasks/${ taskId }/subtasks/${ id }` ),
+	reorder: ( taskId: number, items: Array<{ id: number; position: number }> ) =>
+		api.post( `tasks/${ taskId }/subtasks/reorder`, { items } ),
 };
 
 // ---- Taxonomies ----
 export const taxonomiesApi = {
 	getAll: ( workspaceId: number, type?: string ) =>
 		api.get< Taxonomy[] >( 'taxonomies', { workspace_id: workspaceId, ...(type ? { type } : {}) } ),
-	create: ( data: { workspace_id: number; name: string; type: string; color?: string; icon?: string } ) =>
+	create: ( data: { workspace_id: number; name: string; type: string; color?: string; icon?: string; is_global?: boolean } ) =>
 		api.post< Taxonomy >( 'taxonomies', data ),
-	update: ( id: number, data: { name?: string; color?: string; icon?: string; position?: number } ) =>
+	update: ( id: number, data: { name?: string; color?: string; icon?: string; position?: number; is_global?: boolean; workspace_id?: number } ) =>
 		api.put< Taxonomy >( `taxonomies/${ id }`, data ),
 	reorder: ( items: { id: number; position: number }[] ) =>
 		api.post( 'taxonomies/reorder', { items } ),

@@ -24,7 +24,7 @@ class Department {
 		global $wpdb;
 
 		$table_name    = $wpdb->prefix . self::$table;
-		$teams_table   = $wpdb->prefix . 'st_todox_teams';
+		$table_pivot   = $wpdb->prefix . 'st_todox_relations';
 		$values        = [ $workspace_id ];
 		$search_clause = '';
 
@@ -35,10 +35,10 @@ class Department {
 
 		// Build query with escaped table identifiers.
 		$query = "SELECT d.*,
-					(SELECT COUNT(*) FROM `{$teams_table}` WHERE department_id = d.id) as teams_count
+					(SELECT COUNT(DISTINCT td.relation_id) FROM `{$table_pivot}` td WHERE td.relatable_id = d.id AND td.relatable_type = 'department') as teams_count
 				FROM `{$table_name}` d
 				WHERE d.workspace_id = %d{$search_clause}
-				ORDER BY d.name ASC"; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				ORDER BY d.position ASC, d.name ASC"; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
@@ -107,6 +107,33 @@ class Department {
 		global $wpdb;
 
 		return (bool) $wpdb->delete( $wpdb->prefix . self::$table, [ 'id' => $id ] ); // phpcs:ignore
+	}
+
+	public static function get_workspace_id( int $id ): ?int {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$val = $wpdb->get_var( $wpdb->prepare( 'SELECT workspace_id FROM %i WHERE id = %d', $wpdb->prefix . self::$table, $id ) );
+		return $val !== null ? (int) $val : null;
+	}
+
+	public static function reorder( array $items ): void {
+		global $wpdb;
+
+		foreach ( $items as $item ) {
+			$id  = isset( $item['id'] ) ? (int) $item['id'] : 0;
+			$pos = isset( $item['position'] ) ? (int) $item['position'] : 0;
+			if ( $id <= 0 ) {
+				continue;
+			}
+			$wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$wpdb->prefix . self::$table,
+				[ 'position' => $pos ],
+				[ 'id' => $id ],
+				[ '%d' ],
+				[ '%d' ]
+			);
+		}
 	}
 
 	public static function format( array $row ): array {

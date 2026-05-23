@@ -21,9 +21,10 @@ class CreateSubtasksTable {
 			`task_id`     BIGINT UNSIGNED NOT NULL,
 			`title`       VARCHAR(500)    NOT NULL,
 			`description` TEXT            DEFAULT NULL,
-			`status`      ENUM('todo','in_progress','done') NOT NULL DEFAULT 'todo',
-			`taxonomy_id` BIGINT UNSIGNED DEFAULT NULL,
+			`status_id`   BIGINT UNSIGNED DEFAULT NULL,
+			`label_ids`   JSON            DEFAULT NULL,
 			`priority`    ENUM('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+			`start_date`  DATE            DEFAULT NULL,
 			`due_date`    DATE            DEFAULT NULL,
 			`completed`   TINYINT(1)      NOT NULL DEFAULT 0,
 			`position`    INT             NOT NULL DEFAULT 0,
@@ -33,20 +34,10 @@ class CreateSubtasksTable {
 			PRIMARY KEY  (`id`),
 			KEY          `task_id` (`task_id`),
 			KEY          `assignee_id` (`assignee_id`),
-			KEY          `status` (`status`)
-		) {$charset};";
-
-		$subtask_labels = "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}st_todox_subtask_labels` (
-			`id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			`subtask_id` BIGINT UNSIGNED NOT NULL,
-			`name`       VARCHAR(100)    NOT NULL,
-			`color`      VARCHAR(20)     NOT NULL DEFAULT '#6366f1',
-			PRIMARY KEY  (`id`),
-			KEY          `subtask_id` (`subtask_id`)
+			KEY          `status_id` (`status_id`)
 		) {$charset};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $subtasks );
-		dbDelta( $subtask_labels );
 	}
 }

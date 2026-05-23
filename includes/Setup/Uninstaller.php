@@ -41,16 +41,14 @@ class Uninstaller {
 		global $wpdb;
 
 		$tables = [
-			'st_todox_audit_logs',
 			'st_todox_notifications',
-			'st_todox_subtask_labels',
 			'st_todox_subtasks',
 			'st_todox_task_attachments',
 			'st_todox_task_activities',
 			'st_todox_task_comments',
-			'st_todox_task_labels',
 			'st_todox_tasks',
 			'st_todox_sprints',
+			'st_todox_relations',
 			'st_todox_projects',
 			'st_todox_taxonomies',
 			'st_todox_team_members',
@@ -71,5 +69,6 @@ class Uninstaller {
 		delete_option( Keys::DB_VERSION );
 		delete_option( Keys::INSTALLED_AT );
 		delete_option( Keys::SETTINGS );
+		delete_option( Keys::PAGE_ID );
 	}
 }

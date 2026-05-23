@@ -3,7 +3,6 @@
  */
 import { useState, useCallback, useRef, useEffect } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
 	DndContext,
@@ -28,8 +27,6 @@ import {
 	GripVertical,
 	Plus,
 	CheckSquare,
-	LayoutGrid,
-	List,
 } from 'lucide-react';
 
 /**
@@ -44,8 +41,11 @@ import Spinner from '../../components/ui/Spinner';
 import PriorityBadge from '../../components/ui/PriorityBadge';
 import Avatar from '../../components/ui/Avatar';
 import CreateTaskModal from '../../components/features/task/CreateTaskModal';
+import InlineTaskInput from '../../components/features/task/InlineTaskInput';
+import TaskDetailModal from '../../components/features/task/TaskDetailModal';
+import ViewSwitcher from '../../components/features/task/ViewSwitcher';
 import { formatDate, isOverdue } from '../../utils/helpers';
-import type { Task, TaskStatus } from '../../types';
+import type { Task } from '../../types';
 
 /* ---- Subtask progress bar ---- */
 const SubtaskProgress = ( { total, done }: { total: number; done: number } ) => {
@@ -91,8 +91,8 @@ const TaskCard = ( {
 	};
 
 	const overdue       = isOverdue( task.due_date );
-	const subtaskTotal  = task.subtasks?.length ?? 0;
-	const subtaskDone   = task.subtasks?.filter( ( s ) => s.completed ).length ?? 0;
+	const subtaskTotal  = task.subtask_counts?.total ?? task.subtasks?.length ?? 0;
+	const subtaskDone   = task.subtask_counts?.completed ?? task.subtasks?.filter( ( s ) => s.completed ).length ?? 0;
 	const hasLabels     = ( task.labels?.length ?? 0 ) > 0;
 
 	return (
@@ -159,13 +159,13 @@ const TaskCard = ( {
 const KanbanColumnComponent = ( {
 	column,
 	tasks,
-	onAddTask,
 	onTaskClick,
+	onCreated,
 }: {
-	column: { id: string; title: string; color: string };
+	column: { id: string; title: string; color: string; statusId: number | null };
 	tasks: Task[];
-	onAddTask: ( status: string ) => void;
 	onTaskClick: ( id: number ) => void;
+	onCreated: () => void;
 } ) => {
 	const taskIds = tasks.map( ( t ) => `task-${ t.id }` );
 
@@ -189,13 +189,6 @@ const KanbanColumnComponent = ( {
 						{ tasks.length }
 					</span>
 				</div>
-				<button
-					className="st-todox-kanban-column__add-btn"
-					onClick={ () => onAddTask( column.id ) }
-					title={ `Add task to ${ column.title }` }
-				>
-					<Plus size={ 14 } />
-				</button>
 			</div>
 
 			<SortableContext items={ taskIds } strategy={ verticalListSortingStrategy }>
@@ -214,14 +207,13 @@ const KanbanColumnComponent = ( {
 						<div className="st-todox-kanban-column__empty">
 							<CheckSquare size={ 28 } strokeWidth={ 1.5 } />
 							<span>No tasks yet</span>
-							<button
-								className="st-todox-kanban-column__empty-add"
-								onClick={ () => onAddTask( column.id ) }
-							>
-								+ Add task
-							</button>
 						</div>
 					) }
+					<InlineTaskInput
+						statusValue={ column.id }
+						statusId={ column.statusId }
+						onCreated={ onCreated }
+					/>
 				</div>
 			</SortableContext>
 		</div>
@@ -230,14 +222,13 @@ const KanbanColumnComponent = ( {
 
 /* ---- Main Kanban Page ---- */
 const KanbanPage = () => {
-	const navigate = useNavigate();
 	const qc       = useQueryClient();
 	const { activeWorkspaceId } = useWorkspace();
 	const { statuses, isLoading: statusesLoading } = useTaskStatuses();
 
-	const [ createOpen, setCreateOpen ]       = useState( false );
-	const [ defaultStatus, setDefaultStatus ] = useState<string>( 'todo' );
-	const [ activeTask, setActiveTask ]        = useState<Task | null>( null );
+	const [ createOpen, setCreateOpen ] = useState( false );
+	const [ activeTask, setActiveTask ] = useState<Task | null>( null );
+	const [ selectedTaskId, setSelectedTaskId ]   = useState<number | null>( null );
 
 	const [ columns, setColumns ] = useState<Record<string, Task[]>>( {} );
 	const columnsRef = useRef( columns );
@@ -375,11 +366,6 @@ const KanbanPage = () => {
 		reorderMutation.mutate( items );
 	};
 
-	const openCreate = ( status: string ) => {
-		setDefaultStatus( status );
-		setCreateOpen( true );
-	};
-
 	const handleCreated = () => {
 		qc.invalidateQueries( { queryKey: [ 'tasks', 'kanban', activeWorkspaceId ] } );
 	};
@@ -393,10 +379,8 @@ const KanbanPage = () => {
 				description={ `${ totalTasks } task${ totalTasks !== 1 ? 's' : '' } across ${ statuses.length } column${ statuses.length !== 1 ? 's' : '' }` }
 				actions={
 					<div className="st-todox-page-header__btn-group">
-						<Button variant="secondary" onClick={ () => navigate( '/tasks' ) } leftIcon={ <List size={ 14 } /> }>
-							List View
-						</Button>
-						<Button onClick={ () => openCreate( statuses[ 0 ]?.value ?? 'todo' ) } leftIcon={ <Plus size={ 14 } /> }>
+						<ViewSwitcher />
+						<Button onClick={ () => setCreateOpen( true ) } leftIcon={ <Plus size={ 14 } /> }>
 							New Task
 						</Button>
 					</div>
@@ -417,10 +401,10 @@ const KanbanPage = () => {
 						{ statuses.map( ( s ) => (
 							<KanbanColumnComponent
 								key={ s.value }
-								column={ { id: s.value, title: s.label, color: s.color } }
+								column={ { id: s.value, title: s.label, color: s.color, statusId: s.id } }
 								tasks={ columns[ s.value ] ?? [] }
-								onAddTask={ openCreate }
-								onTaskClick={ ( id ) => navigate( `/tasks/${ id }`, { state: { from: 'kanban' } } ) }
+								onTaskClick={ ( id ) => setSelectedTaskId( id ) }
+								onCreated={ handleCreated }
 							/>
 						) ) }
 					</div>
@@ -470,10 +454,14 @@ const KanbanPage = () => {
 					isOpen={ createOpen }
 					onClose={ () => setCreateOpen( false ) }
 					workspaceId={ activeWorkspaceId }
-					defaultStatus={ defaultStatus as TaskStatus }
 					onCreated={ handleCreated }
 				/>
 			) }
+
+			<TaskDetailModal
+				taskId={ selectedTaskId }
+				onClose={ () => setSelectedTaskId( null ) }
+			/>
 		</div>
 	);
 };

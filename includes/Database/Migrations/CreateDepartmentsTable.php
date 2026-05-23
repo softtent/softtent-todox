@@ -23,11 +23,13 @@ class CreateDepartmentsTable {
 			`description`  TEXT            DEFAULT NULL,
 			`color`        VARCHAR(20)     NOT NULL DEFAULT '#6366f1',
 			`head_id`      BIGINT UNSIGNED DEFAULT NULL,
+			`position`     INT             NOT NULL DEFAULT 0,
 			`created_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			`updated_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (`id`),
 			KEY          `workspace_id` (`workspace_id`),
-			KEY          `head_id` (`head_id`)
+			KEY          `head_id` (`head_id`),
+			KEY          `position` (`position`)
 		) {$charset};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';

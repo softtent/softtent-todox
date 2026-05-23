@@ -20,6 +20,16 @@ class SprintController extends RestApi {
 	protected $base = 'sprints';
 
 	public function routes(): void {
+		$by_reorder = function ( \WP_REST_Request $req ) {
+			$items = $req->get_param( 'items' );
+			if ( ! is_array( $items ) || empty( $items ) ) {
+				return new \WP_Error( 'rest_invalid_items', esc_html__( 'Items array is required.', 'softtent-todox' ), [ 'status' => 400 ] );
+			}
+			$first_id = (int) ( $items[0]['id'] ?? 0 );
+			$ws_id    = Sprint::get_workspace_id( $first_id );
+			return $ws_id ? $this->can_access_workspace( $ws_id ) : false;
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base, [
 				[
@@ -31,6 +41,16 @@ class SprintController extends RestApi {
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
 					'permission_callback' => [ $this, 'is_workspace_member' ],
+				],
+			]
+        );
+
+		register_rest_route(
+            $this->namespace, '/' . $this->base . '/reorder', [
+				[
+					'methods'             => 'POST',
+					'callback'            => [ $this, 'reorder' ],
+					'permission_callback' => $by_reorder,
 				],
 			]
         );
@@ -91,7 +111,17 @@ class SprintController extends RestApi {
 			return $this->error( esc_html__( 'project_id is required.', 'softtent-todox' ) );
 		}
 
-		$id = Sprint::create( array_merge( $req->get_params(), [ 'name' => $name ] ) );
+		$id = Sprint::create(
+            [
+				'project_id' => $req->get_param( 'project_id' ),
+				'name'       => $name,
+				'goal'       => $req->get_param( 'goal' ),
+				'status'     => $req->get_param( 'status' ),
+				'status_id'  => $req->get_param( 'status_id' ),
+				'start_date' => $req->get_param( 'start_date' ),
+				'end_date'   => $req->get_param( 'end_date' ),
+            ]
+        );
 
 		return $id
 			? $this->ok( Sprint::get( $id ), esc_html__( 'Sprint created.', 'softtent-todox' ), 201 )
@@ -110,5 +140,17 @@ class SprintController extends RestApi {
 		Sprint::delete( (int) $req->get_param( 'id' ) );
 
 		return $this->ok( null, esc_html__( 'Sprint deleted.', 'softtent-todox' ) );
+	}
+
+	public function reorder( \WP_REST_Request $req ): \WP_REST_Response {
+		$items = $req->get_param( 'items' );
+
+		if ( ! is_array( $items ) || empty( $items ) ) {
+			return $this->error( esc_html__( 'Items array is required.', 'softtent-todox' ) );
+		}
+
+		Sprint::reorder( $items );
+
+		return $this->ok( null, esc_html__( 'Sprints reordered.', 'softtent-todox' ) );
 	}
 }

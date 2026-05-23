@@ -30,24 +30,7 @@ class CreateNotificationsTable {
 			KEY          `user_id_read` (`user_id`, `is_read`)
 		) {$charset};";
 
-		$audit_logs = "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}st_todox_audit_logs` (
-			`id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			`user_id`    BIGINT UNSIGNED DEFAULT NULL,
-			`action`     VARCHAR(100)    NOT NULL,
-			`entity`     VARCHAR(50)     NOT NULL,
-			`entity_id`  BIGINT UNSIGNED NOT NULL,
-			`old_values` JSON            DEFAULT NULL,
-			`new_values` JSON            DEFAULT NULL,
-			`ip_address` VARCHAR(45)     DEFAULT NULL,
-			`user_agent` VARCHAR(500)    DEFAULT NULL,
-			`created_at` DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY  (`id`),
-			KEY          `entity` (`entity`, `entity_id`),
-			KEY          `user_id` (`user_id`)
-		) {$charset};";
-
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $notifications );
-		dbDelta( $audit_logs );
 	}
 }

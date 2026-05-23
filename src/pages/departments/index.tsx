@@ -1,24 +1,41 @@
 /**
  * External dependencies
  */
-import { useState } from '@wordpress/element';
+import { useState, useMemo, useEffect, useRef } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
-import { Building2, Briefcase, MoreHorizontal, Pencil, Trash2, Plus } from 'lucide-react';
+import {
+	DndContext,
+	DragEndEvent,
+	DragOverlay,
+	DragStartEvent,
+	PointerSensor,
+	useSensor,
+	useSensors,
+	closestCenter,
+} from '@dnd-kit/core';
+import {
+	SortableContext,
+	useSortable,
+	verticalListSortingStrategy,
+	arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Building2, Briefcase, Pencil, Trash2, Plus, Search, GripVertical } from 'lucide-react';
 
 /**
  * Internal dependencies
  */
 import { departmentsApi, usersApi } from '../../api';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Avatar from '../../components/ui/Avatar';
 import Spinner from '../../components/ui/Spinner';
+import { ColorPicker, COLORS_ENTITY } from '../../components/inputs';
 import type { Department, CreateDepartmentInput } from '../../types';
-
-const COLORS = [ '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6' ];
 
 const emptyForm = (): CreateDepartmentInput => ( {
 	workspace_id: 0,
@@ -28,6 +45,85 @@ const emptyForm = (): CreateDepartmentInput => ( {
 	head_id:      null,
 } );
 
+/* ---- Sortable row ---- */
+const SortableRow = ( {
+	dept,
+	checked,
+	onSelect,
+	onEdit,
+	onDelete,
+}: {
+	dept:     Department;
+	checked:  boolean;
+	onSelect: ( id: number ) => void;
+	onEdit:   ( d: Department ) => void;
+	onDelete: ( d: Department ) => void;
+} ) => {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable( { id: dept.id } );
+
+	const style: React.CSSProperties = {
+		transform: CSS.Transform.toString( transform ),
+		transition,
+		opacity:   isDragging ? 0.35 : 1,
+		position:  'relative',
+		zIndex:    isDragging ? 1 : 'auto',
+	};
+
+	return (
+		<tr ref={ setNodeRef } style={ style } { ...attributes } className={ `st-todox-table__row ${ isDragging ? 'st-todox-table__row--dragging' : '' } ${ checked ? 'st-todox-table__row--selected' : '' }` }>
+			<td className="st-todox-table__drag-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<span className="st-todox-table__drag-handle" { ...listeners }>
+					<GripVertical size={ 14 } />
+				</span>
+			</td>
+			<td className="st-todox-table__check-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<input type="checkbox" checked={ checked } onChange={ () => onSelect( dept.id ) } />
+			</td>
+			<td className="st-todox-table__title-cell">
+				<div className="st-todox-entity-name">
+					<span className="st-todox-entity-name__dot" style={ { background: dept.color } } />
+					<span className="st-todox-entity-name__text">{ dept.name }</span>
+				</div>
+			</td>
+			<td>
+				{ dept.description ? (
+					<span className="st-todox-text--muted st-todox-table__cell-truncate">{ dept.description }</span>
+				) : (
+					<span className="st-todox-text--muted">—</span>
+				) }
+			</td>
+			<td>
+				{ dept.head ? (
+					<div className="st-todox-assignee">
+						<Avatar name={ dept.head.name } src={ dept.head.avatar } size={ 22 } />
+						<span className="st-todox-assignee__name">{ dept.head.name }</span>
+					</div>
+				) : (
+					<span className="st-todox-text--muted">—</span>
+				) }
+			</td>
+			<td>
+				<div className="st-todox-entity-count">
+					<Briefcase size={ 12 } />
+					{ dept.teams_count ?? 0 }
+				</div>
+			</td>
+			<td className="st-todox-table__actions-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<div className="st-todox-table__row-actions">
+					<button className="st-todox-table__action-btn" title="Edit" onClick={ () => onEdit( dept ) }>
+						<Pencil size={ 13 } />
+					</button>
+					<button className="st-todox-table__action-btn st-todox-table__action-btn--danger" title="Delete" onClick={ () => onDelete( dept ) }>
+						<Trash2 size={ 13 } />
+					</button>
+				</div>
+			</td>
+		</tr>
+	);
+};
+
+const EMPTY_DEPTS: Department[] = [];
+
 const DepartmentsPage = () => {
 	const qc = useQueryClient();
 	const { activeWorkspaceId, activeWorkspace } = useWorkspace();
@@ -35,10 +131,15 @@ const DepartmentsPage = () => {
 	const [ modalOpen, setModalOpen ]       = useState( false );
 	const [ editing, setEditing ]           = useState< Department | null >( null );
 	const [ deleteTarget, setDeleteTarget ] = useState< Department | null >( null );
-	const [ menuOpen, setMenuOpen ]         = useState< number | null >( null );
 	const [ form, setForm ]                 = useState< CreateDepartmentInput >( emptyForm() );
+	const [ search, setSearch ]             = useState( '' );
+	const [ ordered, setOrdered ]           = useState< Department[] >( [] );
+	const [ activeDrag, setActiveDrag ]     = useState< Department | null >( null );
+	const [ selectedIds, setSelectedIds ]   = useState< Set< number > >( new Set() );
+	const [ bulkConfirmOpen, setBulkConfirmOpen ] = useState( false );
+	const selectAllRef                      = useRef< HTMLInputElement >( null );
 
-	const { data: departments = [], isLoading } = useQuery( {
+	const { data: departments = EMPTY_DEPTS, isLoading } = useQuery( {
 		queryKey: [ 'departments', activeWorkspaceId ],
 		queryFn:  () => departmentsApi.getAll( activeWorkspaceId! ),
 		enabled:  !! activeWorkspaceId,
@@ -50,6 +151,29 @@ const DepartmentsPage = () => {
 		staleTime: 5 * 60_000,
 	} );
 	const users = usersData?.items ?? [];
+
+	useEffect( () => {
+		setOrdered( departments as Department[] );
+	}, [ departments ] );
+
+	const filtered = useMemo( () => {
+		const q = search.trim().toLowerCase();
+		if ( ! q ) return ordered;
+		return ordered.filter( ( d ) => d.name.toLowerCase().includes( q ) );
+	}, [ ordered, search ] );
+
+	const allSelected  = filtered.length > 0 && filtered.every( ( d ) => selectedIds.has( d.id ) );
+	const someSelected = ! allSelected && filtered.some( ( d ) => selectedIds.has( d.id ) );
+
+	useEffect( () => {
+		if ( selectAllRef.current ) selectAllRef.current.indeterminate = someSelected;
+	}, [ someSelected ] );
+
+	const toggleSelect = ( id: number ) =>
+		setSelectedIds( ( prev ) => { const s = new Set( prev ); s.has( id ) ? s.delete( id ) : s.add( id ); return s; } );
+
+	const toggleAll = () =>
+		setSelectedIds( allSelected ? new Set() : new Set( filtered.map( ( d ) => d.id ) ) );
 
 	const invalidate = () => qc.invalidateQueries( { queryKey: [ 'departments', activeWorkspaceId ] } );
 
@@ -72,6 +196,40 @@ const DepartmentsPage = () => {
 		onError:    ( err: Error ) => toast.error( err.message ),
 	} );
 
+	const bulkDeleteMutation = useMutation( {
+		mutationFn: ( ids: number[] ) => Promise.all( ids.map( ( id ) => departmentsApi.delete( id ) ) ),
+		onSuccess:  () => { invalidate(); setSelectedIds( new Set() ); toast.success( 'Departments deleted.' ); },
+		onError:    ( err: Error ) => toast.error( err.message ),
+	} );
+
+	const reorderMutation = useMutation( {
+		mutationFn: ( items: { id: number; position: number }[] ) => departmentsApi.reorder( items ),
+		onError:    ( err: Error ) => {
+			toast.error( err.message );
+			setOrdered( departments as Department[] );
+		},
+	} );
+
+	const sensors = useSensors( useSensor( PointerSensor, { activationConstraint: { distance: 5 } } ) );
+
+	const handleDragStart = ( event: DragStartEvent ) => {
+		setActiveDrag( ordered.find( ( d ) => d.id === event.active.id ) ?? null );
+	};
+
+	const handleDragEnd = ( event: DragEndEvent ) => {
+		const { active, over } = event;
+		setActiveDrag( null );
+		if ( ! over || active.id === over.id ) return;
+
+		setOrdered( ( prev ) => {
+			const oldIdx    = prev.findIndex( ( d ) => d.id === active.id );
+			const newIdx    = prev.findIndex( ( d ) => d.id === over.id );
+			const reordered = arrayMove( prev, oldIdx, newIdx );
+			reorderMutation.mutate( reordered.map( ( d, i ) => ( { id: d.id, position: i } ) ) );
+			return reordered;
+		} );
+	};
+
 	const openCreate = () => {
 		setEditing( null );
 		setForm( { ...emptyForm(), workspace_id: activeWorkspaceId! } );
@@ -87,7 +245,6 @@ const DepartmentsPage = () => {
 			color:        dept.color,
 			head_id:      dept.head_id,
 		} );
-		setMenuOpen( null );
 		setModalOpen( true );
 	};
 
@@ -110,100 +267,125 @@ const DepartmentsPage = () => {
 
 	return (
 		<div className="st-todox-page">
-			{/* Page Header */}
-			<div className="st-todox-page-hd">
-				<div className="st-todox-page-hd__left">
-					<div className="st-todox-page-hd__icon-box">
-						<Building2 size={ 20 } />
-					</div>
-					<div>
-						<h1 className="st-todox-page-hd__title">Departments</h1>
-						<p className="st-todox-page-hd__sub">
-							{ activeWorkspace?.name } · { departments.length } department{ departments.length !== 1 ? 's' : '' }
-						</p>
+			<PageHeader
+				title="Departments"
+				description={ `${ activeWorkspace?.name } · ${ ( departments as Department[] ).length } department${ ( departments as Department[] ).length !== 1 ? 's' : '' }` }
+				actions={
+					activeWorkspaceId ? (
+						<Button onClick={ openCreate } leftIcon={ <Plus size={ 14 } /> }>
+							New Department
+						</Button>
+					) : undefined
+				}
+			/>
+
+			<div className="st-todox-surface-card">
+				{/* Toolbar */}
+				<div className="st-todox-tasks-toolbar">
+					<div className="st-todox-tasks-toolbar__search">
+						<Search size={ 14 } className="st-todox-tasks-toolbar__search-icon" />
+						<input
+							type="search"
+							className="st-todox-tasks-toolbar__input"
+							placeholder="Search departments…"
+							value={ search }
+							onChange={ ( e ) => setSearch( e.target.value ) }
+						/>
 					</div>
 				</div>
-				{ activeWorkspaceId && (
-					<Button onClick={ openCreate }>
-						<Plus size={ 14 } /> New Department
-					</Button>
+
+				{ isLoading ? (
+					<div className="st-todox-page-loader"><Spinner /></div>
+				) : ( departments as Department[] ).length === 0 ? (
+					<div className="st-todox-empty-inline">
+						<Building2 size={ 36 } strokeWidth={ 1.5 } style={ { opacity: 0.3 } } />
+						<p>No departments yet — create your first one.</p>
+						{ activeWorkspaceId && (
+							<Button size="sm" onClick={ openCreate } leftIcon={ <Plus size={ 13 } /> }>
+								New Department
+							</Button>
+						) }
+					</div>
+				) : filtered.length === 0 ? (
+					<div className="st-todox-empty-inline">
+						<Building2 size={ 36 } strokeWidth={ 1.5 } style={ { opacity: 0.3 } } />
+						<p>No departments match your search.</p>
+					</div>
+				) : (
+					<DndContext
+						sensors={ sensors }
+						collisionDetection={ closestCenter }
+						onDragStart={ handleDragStart }
+						onDragEnd={ handleDragEnd }
+					>
+						{ selectedIds.size > 0 && (
+							<div className="st-todox-bulk-bar">
+								<span className="st-todox-bulk-bar__count">{ selectedIds.size } selected</span>
+								<div className="st-todox-bulk-bar__actions">
+									<button
+										className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--danger"
+										onClick={ () => setBulkConfirmOpen( true ) }
+									>
+										<Trash2 size={ 13 } />
+										Delete selected
+									</button>
+									<span className="st-todox-bulk-bar__sep" />
+									<button
+										className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--ghost"
+										onClick={ () => setSelectedIds( new Set() ) }
+									>
+										Clear
+									</button>
+								</div>
+							</div>
+						) }
+						<div className="st-todox-table-scroll">
+							<table className="st-todox-table">
+								<thead>
+									<tr>
+										<th style={ { width: 32 } } />
+										<th className="st-todox-table__check-cell">
+											<input
+												type="checkbox"
+												ref={ selectAllRef }
+												checked={ allSelected }
+												onChange={ toggleAll }
+											/>
+										</th>
+										<th style={ { width: '28%' } }>Name</th>
+										<th>Description</th>
+										<th>Head</th>
+										<th style={ { width: 80 } }>Teams</th>
+										<th style={ { width: 80 } } />
+									</tr>
+								</thead>
+								<SortableContext items={ filtered.map( ( d ) => d.id ) } strategy={ verticalListSortingStrategy }>
+									<tbody>
+										{ filtered.map( ( dept ) => (
+											<SortableRow
+												key={ dept.id }
+												dept={ dept }
+												checked={ selectedIds.has( dept.id ) }
+												onSelect={ toggleSelect }
+												onEdit={ openEdit }
+												onDelete={ setDeleteTarget }
+											/>
+										) ) }
+									</tbody>
+								</SortableContext>
+							</table>
+						</div>
+						<DragOverlay dropAnimation={ { duration: 160, easing: 'ease' } }>
+							{ activeDrag && (
+								<div className="st-todox-table__drag-overlay">
+									<GripVertical size={ 14 } className="st-todox-table__drag-overlay-grip" />
+									<span className="st-todox-table__drag-overlay-title">{ activeDrag.name }</span>
+								</div>
+							) }
+						</DragOverlay>
+					</DndContext>
 				) }
 			</div>
-
-			{ isLoading ? (
-				<Spinner />
-			) : departments.length === 0 ? (
-				<div className="st-todox-empty-dashed">
-					<Building2 size={ 40 } className="st-todox-empty-dashed__icon" />
-					<p className="st-todox-empty-dashed__title">No departments yet</p>
-					<p className="st-todox-empty-dashed__desc">Create a department to organise your teams.</p>
-					{ activeWorkspaceId && (
-						<Button onClick={ openCreate } className="st-todox-empty-dashed__action">New Department</Button>
-					) }
-				</div>
-			) : (
-				<div className="st-todox-entity-grid">
-					{ departments.map( ( dept: Department ) => (
-						<div key={ dept.id } className="st-todox-entity-card" style={ { borderTopColor: dept.color, borderTopWidth: '3px' } }>
-							<div className="st-todox-entity-card__body">
-								{/* Head row */}
-								<div className="st-todox-entity-card__head-row">
-									<div className="st-todox-entity-card__avatar" style={ { background: dept.color } }>
-										{ dept.name.slice( 0, 1 ).toUpperCase() }
-									</div>
-									<div className="st-todox-entity-card__meta">
-										<h3 className="st-todox-entity-card__name">{ dept.name }</h3>
-										{ dept.description && (
-											<p className="st-todox-entity-card__desc">{ dept.description }</p>
-										) }
-									</div>
-									{/* Actions menu */}
-									<div className="st-todox-entity-card__menu-wrap">
-										<button
-											className="st-todox-entity-card__menu-btn"
-											onClick={ ( e ) => { e.stopPropagation(); setMenuOpen( menuOpen === dept.id ? null : dept.id ); } }
-										>
-											<MoreHorizontal size={ 15 } />
-										</button>
-										{ menuOpen === dept.id && (
-											<>
-												<div className="st-todox-dropdown-backdrop" onClick={ () => setMenuOpen( null ) } />
-												<div className="st-todox-entity-card__menu-dropdown">
-													<button onClick={ () => openEdit( dept ) }>
-														<Pencil size={ 13 } /> Edit
-													</button>
-													<button
-														className="st-todox-entity-card__menu-danger"
-														onClick={ () => { setDeleteTarget( dept ); setMenuOpen( null ); } }
-													>
-														<Trash2 size={ 13 } /> Delete
-													</button>
-												</div>
-											</>
-										) }
-									</div>
-								</div>
-
-								{/* Stats */}
-								<div className="st-todox-entity-card__stats">
-									<span>
-										<Briefcase size={ 13 } />
-										<strong>{ dept.teams_count ?? 0 }</strong> team{ ( dept.teams_count ?? 0 ) !== 1 ? 's' : '' }
-									</span>
-								</div>
-
-								{/* Head user */}
-								{ dept.head && (
-									<div className="st-todox-entity-card__footer">
-										<Avatar name={ dept.head.name } src={ dept.head.avatar } size={ 18 } />
-										<span className="st-todox-entity-card__footer-label">{ dept.head.name }</span>
-									</div>
-								) }
-							</div>
-						</div>
-					) ) }
-				</div>
-			) }
 
 			{/* Create / Edit Modal */}
 			<Modal
@@ -257,17 +439,7 @@ const DepartmentsPage = () => {
 					</div>
 					<div className="st-todox-form__group">
 						<label className="st-todox-form__label">Color</label>
-						<div className="st-todox-color-picker">
-							{ COLORS.map( ( c ) => (
-								<button
-									key={ c }
-									type="button"
-									className={ `st-todox-color-picker__swatch ${ form.color === c ? 'st-todox-color-picker__swatch--active' : '' }` }
-									style={ { background: c } }
-									onClick={ () => setForm( { ...form, color: c } ) }
-								/>
-							) ) }
-						</div>
+						<ColorPicker colors={ COLORS_ENTITY } value={ form.color } onChange={ ( c ) => setForm( { ...form, color: c } ) } />
 					</div>
 				</form>
 			</Modal>
@@ -280,6 +452,16 @@ const DepartmentsPage = () => {
 				message={ `Delete "${ deleteTarget?.name }"? Teams in this department will lose their department link.` }
 				confirmLabel="Delete"
 				loading={ deleteMutation.isPending }
+			/>
+
+			<ConfirmDialog
+				isOpen={ bulkConfirmOpen }
+				onClose={ () => setBulkConfirmOpen( false ) }
+				onConfirm={ () => { setBulkConfirmOpen( false ); bulkDeleteMutation.mutate( [ ...selectedIds ] ); } }
+				title={ `Delete ${ selectedIds.size } Department${ selectedIds.size !== 1 ? 's' : '' }?` }
+				message="This will permanently delete the selected departments. Teams inside them will lose their department link."
+				confirmLabel="Delete All"
+				loading={ bulkDeleteMutation.isPending }
 			/>
 		</div>
 	);

@@ -60,10 +60,14 @@ class Workspace {
 
 		$workspaces = array_map( [ self::class, 'format' ], $rows ?? [] );
 
-		foreach ( $workspaces as &$ws ) {
-			$ws['members'] = self::get_members( $ws['id'] );
+		if ( ! empty( $workspaces ) ) {
+			$ids         = array_column( $workspaces, 'id' );
+			$members_map = self::get_members_for_workspaces( $ids );
+			foreach ( $workspaces as &$ws ) {
+				$ws['members'] = $members_map[ $ws['id'] ] ?? [];
+			}
+			unset( $ws );
 		}
-		unset( $ws );
 
 		return $workspaces;
 	}
@@ -281,6 +285,57 @@ class Workspace {
                 ];
             }, $rows ?? []
         );
+	}
+
+	/**
+	 * Batch-load members for multiple workspaces in one query.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int[] $workspace_ids
+	 * @return array<int, array[]>
+	 */
+	private static function get_members_for_workspaces( array $workspace_ids ): array {
+		global $wpdb;
+
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $workspace_ids ) ) ) );
+		if ( empty( $ids ) ) {
+			return [];
+		}
+
+		$table_members = $wpdb->prefix . self::$members_table;
+		$users_table   = $wpdb->users;
+		$id_list       = implode( ',', $ids );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.display_name as name, u.user_email as email
+				FROM %i wm
+				INNER JOIN %i u ON u.ID = wm.user_id
+				WHERE FIND_IN_SET(wm.workspace_id, %s)
+				ORDER BY wm.joined_at ASC',
+				$table_members,
+				$users_table,
+				$id_list
+			),
+			ARRAY_A
+		);
+
+		$map = [];
+		foreach ( $rows ?? [] as $row ) {
+			$wid         = (int) $row['workspace_id'];
+			$map[ $wid ][] = [
+				'id'        => (int) $row['user_id'],
+				'name'      => $row['name'],
+				'email'     => $row['email'],
+				'avatar'    => get_avatar_url( (int) $row['user_id'], [ 'size' => 40 ] ),
+				'role'      => $row['role'],
+				'joined_at' => Fns::format_datetime( $row['joined_at'] ),
+			];
+		}
+
+		return $map;
 	}
 
 	/**

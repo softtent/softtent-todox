@@ -17,20 +17,20 @@ class CreateTeamsTable {
 		$charset = $wpdb->get_charset_collate();
 
 		$sql = "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}st_todox_teams` (
-			`id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			`department_id` BIGINT UNSIGNED NOT NULL,
-			`workspace_id`  BIGINT UNSIGNED NOT NULL,
-			`name`          VARCHAR(200)    NOT NULL,
-			`description`   TEXT            DEFAULT NULL,
-			`color`         VARCHAR(20)     NOT NULL DEFAULT '#6366f1',
-			`avatar`        VARCHAR(500)    DEFAULT NULL,
-			`manager_id`    BIGINT UNSIGNED DEFAULT NULL,
-			`created_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			`updated_at`    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			`id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			`workspace_id` BIGINT UNSIGNED NOT NULL,
+			`name`         VARCHAR(200)    NOT NULL,
+			`description`  TEXT            DEFAULT NULL,
+			`color`        VARCHAR(20)     NOT NULL DEFAULT '#6366f1',
+			`avatar`       VARCHAR(500)    DEFAULT NULL,
+			`manager_id`   BIGINT UNSIGNED DEFAULT NULL,
+			`position`     INT             NOT NULL DEFAULT 0,
+			`created_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			`updated_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (`id`),
-			KEY          `department_id` (`department_id`),
 			KEY          `workspace_id` (`workspace_id`),
-			KEY          `manager_id` (`manager_id`)
+			KEY          `manager_id` (`manager_id`),
+			KEY          `position` (`position`)
 		) {$charset};";
 
 		$sql2 = "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}st_todox_team_members` (

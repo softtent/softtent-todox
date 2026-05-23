@@ -1,20 +1,44 @@
 /**
  * External dependencies
  */
-import { useState } from '@wordpress/element';
+import { useState, useRef, useEffect } from '@wordpress/element';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
-	ArrowLeft, ChevronRight, Edit3, Trash2, X, Plus,
+	ArrowLeft, ChevronRight, ChevronDown, Edit3, Trash2, X, Plus, Check, GripVertical,
 	User, Calendar, Clock, Tag, MessageSquare, Activity,
-	CheckSquare2, CircleDashed, AlertCircle, Circle,
+	CheckSquare2, CircleDashed, AlertCircle, Pencil,
 } from 'lucide-react';
+
+interface TaskDetailProps {
+	taskId?: number;
+	onClose?: () => void;
+}
+
+/**
+ * dnd-kit
+ */
+import {
+	DndContext,
+	closestCenter,
+	PointerSensor,
+	useSensor,
+	useSensors,
+	type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+	SortableContext,
+	verticalListSortingStrategy,
+	useSortable,
+	arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 /**
  * Internal dependencies
  */
-import { tasksApi, subtasksApi, usersApi, sprintsApi } from '../../api';
+import { tasksApi, subtasksApi, usersApi } from '../../api';
 import { useTaskStatuses } from '../../hooks/useTaskStatuses';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
@@ -22,9 +46,10 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import PriorityBadge from '../../components/ui/PriorityBadge';
 import Avatar from '../../components/ui/Avatar';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import TablePickerMenu from '../../components/ui/TablePickerMenu';
 import SubtaskModal from '../../components/features/task/SubtaskModal';
 import { formatDate, formatRelativeTime, isOverdue } from '../../utils/helpers';
-import type { Task, TaskComment, Subtask, TaskActivity, TaskStatus, TaskPriority, Sprint } from '../../types';
+import type { Task, TaskComment, Subtask, TaskActivity, TaskStatus, TaskPriority, User as UserType } from '../../types';
 
 /* ---- Priority config ---- */
 const PRIORITY_BORDER: Record<string, string> = {
@@ -32,13 +57,6 @@ const PRIORITY_BORDER: Record<string, string> = {
 	high:   '#f97316',
 	medium: '#6366f1',
 	low:    '#e2e8f0',
-};
-
-const PRIORITY_ACCENT: Record<string, string> = {
-	urgent: '#ef4444',
-	high:   '#f97316',
-	medium: '#6366f1',
-	low:    '#94a3b8',
 };
 
 const ACTIVITY_CONFIG: Record<string, { chip: string; dot: string }> = {
@@ -50,34 +68,217 @@ const ACTIVITY_CONFIG: Record<string, { chip: string; dot: string }> = {
 };
 const DEFAULT_ACTIVITY = { chip: 'st-todox-activity-chip--slate', dot: 'st-todox-activity-dot--slate' };
 
-const SUBTASK_STATUS_COLOR: Record<string, string> = {
-	todo:        '#94a3b8',
-	in_progress: '#6366f1',
-	done:        '#10b981',
-};
-
-const SUBTASK_STATUS_LABEL: Record<string, string> = {
-	todo:        'To Do',
-	in_progress: 'In Progress',
-	done:        'Done',
-};
-
-const PRIORITY_DOT: Record<string, string> = {
-	urgent: '#ef4444',
-	high:   '#f97316',
-	medium: '#6366f1',
-	low:    '#94a3b8',
-};
-
 type Tab = 'subtasks' | 'comments' | 'activity';
 
-const TaskDetail = () => {
+/* ── Sortable subtask row ──────────────────────────────────────────────────── */
+const SortableSubtaskRow = ( {
+	st,
+	checked,
+	taskStatuses,
+	users,
+	onSelect,
+	onEdit,
+	onDelete,
+	onStatusChange,
+	onPriorityChange,
+	onAssigneeChange,
+	onDueDateChange,
+}: {
+	st:               Subtask;
+	checked:          boolean;
+	taskStatuses:     { value: string; label: string; color: string }[];
+	users:            UserType[];
+	onSelect:         ( id: number ) => void;
+	onEdit:           ( st: Subtask ) => void;
+	onDelete:         ( id: number ) => void;
+	onStatusChange:   ( id: number, status: TaskStatus ) => void;
+	onPriorityChange: ( id: number, priority: TaskPriority ) => void;
+	onAssigneeChange: ( id: number, assigneeId: number | null ) => void;
+	onDueDateChange:  ( id: number, dueDate: string | null ) => void;
+} ) => {
+	const [ dueDateEditing, setDueDateEditing ] = useState( false );
+
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable( { id: st.id } );
+
+	const style: React.CSSProperties = {
+		transform: CSS.Transform.toString( transform ),
+		transition,
+		opacity:   isDragging ? 0.35 : 1,
+		position:  'relative',
+		zIndex:    isDragging ? 1 : 'auto',
+	};
+
+	const overdue = isOverdue( st.due_date ) && st.status !== 'done';
+
+	return (
+		<tr
+			ref={ setNodeRef }
+			style={ style }
+			{ ...attributes }
+			className={ [
+				'st-todox-table__row',
+				overdue    ? 'st-todox-table__row--overdue'  : '',
+				isDragging ? 'st-todox-table__row--dragging' : '',
+				checked    ? 'st-todox-table__row--selected'  : '',
+			].filter( Boolean ).join( ' ' ) }
+		>
+			<td className="st-todox-table__drag-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<span className="st-todox-table__drag-handle" { ...listeners }>
+					<GripVertical size={ 14 } />
+				</span>
+			</td>
+
+			<td className="st-todox-table__check-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<input
+					type="checkbox"
+					checked={ checked }
+					onChange={ () => onSelect( st.id ) }
+				/>
+			</td>
+
+			<td className="st-todox-table__title-cell">
+				<div className="st-todox-table__title">{ st.title }</div>
+				{ st.description && (
+					<div className="st-todox-td-subtask__desc">{ st.description }</div>
+				) }
+			</td>
+
+			{/* Status inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				<TablePickerMenu trigger={ <StatusBadge status={ st.status } /> } title="Change status">
+					{ taskStatuses.map( ( s ) => (
+						<button
+							key={ s.value }
+							className={ `st-todox-inline-picker__item ${ st.status === s.value ? 'st-todox-inline-picker__item--active' : '' }` }
+							onClick={ () => onStatusChange( st.id, s.value as TaskStatus ) }
+						>
+							<StatusBadge status={ s.value as TaskStatus } />
+						</button>
+					) ) }
+				</TablePickerMenu>
+			</td>
+
+			{/* Priority inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				<TablePickerMenu trigger={ <PriorityBadge priority={ st.priority } /> } title="Change priority">
+					{ ( [ 'low', 'medium', 'high', 'urgent' ] as TaskPriority[] ).map( ( p ) => (
+						<button
+							key={ p }
+							className={ `st-todox-inline-picker__item ${ st.priority === p ? 'st-todox-inline-picker__item--active' : '' }` }
+							onClick={ () => onPriorityChange( st.id, p ) }
+						>
+							<PriorityBadge priority={ p } />
+						</button>
+					) ) }
+				</TablePickerMenu>
+			</td>
+
+			{/* Assignee inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				<TablePickerMenu
+					trigger={
+						st.assignee ? (
+							<div className="st-todox-assignee">
+								<Avatar name={ st.assignee.name } src={ st.assignee.avatar } size={ 18 } />
+								<span className="st-todox-assignee__name">{ st.assignee.name }</span>
+							</div>
+						) : (
+							<span className="st-todox-text--muted">—</span>
+						)
+					}
+					title="Change assignee"
+				>
+					<button
+						className={ `st-todox-inline-picker__item ${ ! st.assignee_id ? 'st-todox-inline-picker__item--active' : '' }` }
+						onClick={ () => onAssigneeChange( st.id, null ) }
+					>
+						<span style={ { width: 16, height: 16, borderRadius: '50%', border: '1.5px dashed #94a3b8', display: 'inline-block', flexShrink: 0 } } />
+						Unassigned
+					</button>
+					{ users.map( ( u ) => (
+						<button
+							key={ u.id }
+							className={ `st-todox-inline-picker__item ${ st.assignee_id === u.id ? 'st-todox-inline-picker__item--active' : '' }` }
+							onClick={ () => onAssigneeChange( st.id, u.id ) }
+						>
+							<Avatar name={ u.name } src={ u.avatar } size={ 16 } />
+							{ u.name }
+						</button>
+					) ) }
+				</TablePickerMenu>
+			</td>
+
+			{/* Due date inline picker */}
+			<td onClick={ ( e ) => e.stopPropagation() }>
+				{ dueDateEditing ? (
+					<input
+						type="date"
+						className="st-todox-form__input st-todox-td-meta-date-input"
+						defaultValue={ st.due_date ?? '' }
+						autoFocus
+						onChange={ ( e ) => {
+							onDueDateChange( st.id, e.target.value || null );
+							setDueDateEditing( false );
+						} }
+						onBlur={ () => setDueDateEditing( false ) }
+						onKeyDown={ ( e ) => { if ( e.key === 'Escape' ) setDueDateEditing( false ); } }
+					/>
+				) : (
+					<button
+						className="st-todox-inline-picker__trigger"
+						onClick={ () => setDueDateEditing( true ) }
+						title="Set due date"
+					>
+						{ st.due_date ? (
+							<span className={ `st-todox-table__due ${ overdue ? 'st-todox-table__due--overdue' : '' }` }>
+								<Calendar size={ 12 } />
+								{ formatDate( st.due_date ) }
+							</span>
+						) : (
+							<span className="st-todox-text--muted">—</span>
+						) }
+						<Pencil size={ 10 } className="st-todox-inline-picker__chevron" />
+					</button>
+				) }
+			</td>
+
+			<td className="st-todox-table__actions-cell" onClick={ ( e ) => e.stopPropagation() }>
+				<div className="st-todox-table__row-actions">
+					<button
+						className="st-todox-table__action-btn"
+						onClick={ () => onEdit( st ) }
+						title="Edit"
+					>
+						<Edit3 size={ 13 } />
+					</button>
+					<button
+						className="st-todox-table__action-btn st-todox-table__action-btn--danger"
+						onClick={ () => onDelete( st.id ) }
+						title="Delete"
+					>
+						<Trash2 size={ 13 } />
+					</button>
+				</div>
+			</td>
+		</tr>
+	);
+};
+
+const TaskDetail = ( { taskId: taskIdProp, onClose }: TaskDetailProps = {} ) => {
 	const { id }       = useParams<{ id: string }>();
 	const navigate     = useNavigate();
 	const location     = useLocation();
 	const qc           = useQueryClient();
-	const taskId       = Number( id );
-	const fromKanban   = ( location.state as { from?: string } | null )?.from === 'kanban';
+	const isModal      = !! onClose;
+	const taskId       = taskIdProp ?? Number( id );
+	const fromKanban   = ! isModal && ( location.state as { from?: string } | null )?.from === 'kanban';
 	const backPath     = fromKanban ? '/tasks/kanban' : '/tasks';
 	const backLabel    = fromKanban ? 'Kanban' : 'Tasks';
 
@@ -87,10 +288,33 @@ const TaskDetail = () => {
 	const [ editingCommentId, setEditingCommentId ] = useState<number | null>( null );
 	const [ editCommentContent, setEditCommentContent ] = useState( '' );
 	const [ deleteTaskOpen, setDeleteTaskOpen ]   = useState( false );
-	const [ editOpen, setEditOpen ]               = useState( false );
-	const [ editForm, setEditForm ]               = useState<Partial<Task>>( {} );
 	const [ subtaskModalOpen, setSubtaskModalOpen ] = useState( false );
 	const [ editingSubtask, setEditingSubtask ]     = useState<Subtask | null>( null );
+	const [ addingSubtask, setAddingSubtask ]         = useState( false );
+	const [ newSubtaskTitle, setNewSubtaskTitle ]     = useState( '' );
+	const [ orderedSubtasks, setOrderedSubtasks ]     = useState<Subtask[]>( [] );
+	const [ selectedSubtaskIds, setSelectedSubtaskIds ] = useState<Set<number>>( new Set() );
+	const [ deleteSubtaskConfirmId, setDeleteSubtaskConfirmId ] = useState<number | null>( null );
+	const [ bulkSubtaskConfirmOpen, setBulkSubtaskConfirmOpen ] = useState( false );
+
+	/* Kept as render-time assignment so drag handlers never see stale list */
+	const orderedSubtasksRef = useRef<Subtask[]>( [] );
+	orderedSubtasksRef.current = orderedSubtasks;
+
+	/* Inline editing state */
+	const [ editingTitle, setEditingTitle ]   = useState( false );
+	const [ titleDraft, setTitleDraft ]       = useState( '' );
+	const [ editingDesc, setEditingDesc ]     = useState( false );
+	const [ descDraft, setDescDraft ]         = useState( '' );
+	const [ statusOpen, setStatusOpen ]       = useState( false );
+	const [ priorityOpen, setPriorityOpen ]   = useState( false );
+	const [ assigneeOpen, setAssigneeOpen ]   = useState( false );
+	const [ dueDateEditing, setDueDateEditing ] = useState( false );
+
+	const skipTitleBlur    = useRef( false );
+	const skipDescBlur     = useRef( false );
+	const selectAllSubRef  = useRef<HTMLInputElement>( null );
+	const subtaskInputRef  = useRef<HTMLInputElement>( null );
 
 	const { data: task, isLoading } = useQuery( {
 		queryKey: [ 'tasks', taskId ],
@@ -107,28 +331,41 @@ const TaskDetail = () => {
 	} );
 	const users = usersData?.items ?? [];
 
-	const { data: sprints = [], isFetching: sprintsLoading } = useQuery< Sprint[] >( {
-		queryKey: [ 'sprints', task?.project_id ],
-		queryFn:  () => sprintsApi.getAll( task!.project_id! ),
-		enabled:  !! task?.project_id && editOpen,
-		staleTime: 2 * 60_000,
-	} );
-
 	const invalidate = () => {
 		qc.invalidateQueries( { queryKey: [ 'tasks', taskId ] } );
 		qc.invalidateQueries( { queryKey: [ 'tasks' ] } );
 	};
 
-	const updateMutation = useMutation( {
+	const inlineMutation = useMutation( {
 		mutationFn: ( data: Partial<Task> ) => tasksApi.update( taskId, data ),
-		onSuccess:  () => { invalidate(); setEditOpen( false ); toast.success( 'Task updated.' ); },
+		onSuccess:  () => { invalidate(); toast.success( 'Updated.' ); },
 		onError:    ( err: Error ) => toast.error( err.message ),
 	} );
 
+	const saveTitle = () => {
+		if ( titleDraft.trim() && titleDraft.trim() !== task?.title ) {
+			inlineMutation.mutate( { title: titleDraft.trim() } );
+		}
+	};
+
+	const saveDesc = () => {
+		const val = descDraft.trim() || null;
+		if ( val !== ( task?.description ?? null ) ) {
+			inlineMutation.mutate( { description: val } as Partial<Task> );
+		}
+	};
+
 	const deleteMutation = useMutation( {
 		mutationFn: () => tasksApi.delete( taskId ),
-		onSuccess:  () => { navigate( backPath ); toast.success( 'Task deleted.' ); },
-		onError:    ( err: Error ) => toast.error( err.message ),
+		onSuccess:  () => {
+			toast.success( 'Task deleted.' );
+			if ( onClose ) {
+				onClose();
+			} else {
+				navigate( backPath );
+			}
+		},
+		onError: ( err: Error ) => toast.error( err.message ),
 	} );
 
 	const addCommentMutation = useMutation( {
@@ -169,20 +406,70 @@ const TaskDetail = () => {
 		updateCommentMutation.mutate( { commentId: editingCommentId, content: editCommentContent.trim() } );
 	};
 
-	const toggleSubtaskMutation = useMutation( {
-		mutationFn: ( { subtaskId, completed }: { subtaskId: number; completed: boolean } ) =>
-			subtasksApi.update( taskId, subtaskId, { completed } ),
+	const updateSubtaskMutation = useMutation( {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		mutationFn: ( { id, data }: { id: number; data: Record<string, any> } ) =>
+			subtasksApi.update( taskId, id, data ),
 		onSuccess: () => invalidate(),
 		onError:   ( err: Error ) => toast.error( err.message ),
 	} );
+
+	const handleSubtaskStatusChange   = ( id: number, status: TaskStatus )       => updateSubtaskMutation.mutate( { id, data: { status } } );
+	const handleSubtaskPriorityChange = ( id: number, priority: TaskPriority )    => updateSubtaskMutation.mutate( { id, data: { priority } } );
+	const handleSubtaskAssigneeChange = ( id: number, assigneeId: number | null ) => updateSubtaskMutation.mutate( { id, data: { assignee_id: assigneeId } } );
+	const handleSubtaskDueDateChange  = ( id: number, dueDate: string | null )    => updateSubtaskMutation.mutate( { id, data: { due_date: dueDate } } );
 
 	const deleteSubtaskMutation = useMutation( {
 		mutationFn: ( subtaskId: number ) => subtasksApi.delete( taskId, subtaskId ),
-		onSuccess: () => invalidate(),
+		onSuccess: () => { invalidate(); setSelectedSubtaskIds( new Set() ); setDeleteSubtaskConfirmId( null ); },
 		onError:   ( err: Error ) => toast.error( err.message ),
 	} );
 
-	if ( isLoading ) return <Spinner fullscreen />;
+	const addSubtaskMutation = useMutation( {
+		mutationFn: ( title: string ) => subtasksApi.create( taskId, { title } ),
+		onSuccess: () => { invalidate(); setNewSubtaskTitle( '' ); setTimeout( () => subtaskInputRef.current?.focus(), 0 ); },
+		onError:   ( err: Error ) => toast.error( err.message ),
+	} );
+
+	const reorderSubtaskMutation = useMutation( {
+		mutationFn: ( items: Array<{ id: number; position: number }> ) =>
+			subtasksApi.reorder( taskId, items ),
+		onError: ( err: Error ) => {
+			toast.error( err.message );
+			qc.invalidateQueries( { queryKey: [ 'tasks', taskId ] } );
+		},
+	} );
+
+	const bulkDeleteSubtasksMutation = useMutation( {
+		mutationFn: ( ids: number[] ) =>
+			Promise.all( ids.map( ( id ) => subtasksApi.delete( taskId, id ) ) ),
+		onSuccess: () => {
+			invalidate();
+			setSelectedSubtaskIds( new Set() );
+			setBulkSubtaskConfirmOpen( false );
+			toast.success( 'Subtasks deleted.' );
+		},
+		onError: ( err: Error ) => toast.error( err.message ),
+	} );
+
+	const subtaskSensors = useSensors(
+		useSensor( PointerSensor, { activationConstraint: { distance: 5 } } )
+	);
+
+	/* Sync local ordered list whenever server data refreshes */
+	useEffect( () => {
+		if ( task?.subtasks ) setOrderedSubtasks( task.subtasks );
+	}, [ task?.subtasks ] ); // eslint-disable-line react-hooks/exhaustive-deps
+
+	/* Select-all indeterminate state — must stay before early returns */
+	const allSubtasksSelected  = orderedSubtasks.length > 0 && orderedSubtasks.every( ( s ) => selectedSubtaskIds.has( s.id ) );
+	const someSubtasksSelected = ! allSubtasksSelected && orderedSubtasks.some( ( s ) => selectedSubtaskIds.has( s.id ) );
+
+	useEffect( () => {
+		if ( selectAllSubRef.current ) selectAllSubRef.current.indeterminate = someSubtasksSelected;
+	}, [ someSubtasksSelected ] );
+
+	if ( isLoading ) return <Spinner fullscreen={ ! isModal } />;
 	if ( ! task )    return <div className="st-todox-page"><p>Task not found.</p></div>;
 
 	const subtasks   = task.subtasks   ?? [];
@@ -192,21 +479,30 @@ const TaskDetail = () => {
 	const subtaskProgress = subtasks.length > 0 ? ( doneSubtasks / subtasks.length ) * 100 : 0;
 	const overdue         = isOverdue( task.due_date );
 	const borderColor     = PRIORITY_BORDER[ task.priority ] ?? '#e2e8f0';
-	const accentColor     = PRIORITY_ACCENT[ task.priority ] ?? '#94a3b8';
 	const isCompleted     = task.status === 'completed';
 
-	const openEdit = () => {
-		setEditForm( {
-			title:       task.title,
-			description: task.description,
-			status:      task.status,
-			priority:    task.priority,
-			due_date:    task.due_date,
-			assignee_id: task.assignee_id,
-			sprint_id:   task.sprint_id ?? null,
-		} );
-		setEditOpen( true );
+	const handleSubtaskDragEnd = ( event: DragEndEvent ) => {
+		const { active, over } = event;
+		if ( ! over || active.id === over.id ) return;
+		const oldIdx    = orderedSubtasksRef.current.findIndex( ( s ) => s.id === active.id );
+		const newIdx    = orderedSubtasksRef.current.findIndex( ( s ) => s.id === over.id );
+		const reordered = arrayMove( orderedSubtasksRef.current, oldIdx, newIdx );
+		setOrderedSubtasks( reordered );
+		reorderSubtaskMutation.mutate( reordered.map( ( s, idx ) => ( { id: s.id, position: idx } ) ) );
 	};
+
+	const toggleSubtaskSelect = ( id: number ) =>
+		setSelectedSubtaskIds( ( prev ) => {
+			const s = new Set( prev );
+			s.has( id ) ? s.delete( id ) : s.add( id );
+			return s;
+		} );
+
+	const toggleAllSubtasks = () =>
+		setSelectedSubtaskIds( allSubtasksSelected
+			? new Set()
+			: new Set( orderedSubtasks.map( ( s ) => s.id ) )
+		);
 
 	const TABS: { id: Tab; label: string; count: number }[] = [
 		{ id: 'subtasks', label: 'Subtasks', count: subtasks.length },
@@ -215,16 +511,18 @@ const TaskDetail = () => {
 	];
 
 	return (
-		<div className="st-todox-page st-todox-td">
+		<div className={ `st-todox-page st-todox-td${ isModal ? ' st-todox-td--modal' : '' }` }>
 
-			{/* Breadcrumb */}
-			<div className="st-todox-td__breadcrumb">
-				<button className="st-todox-td__bc-link" onClick={ () => navigate( backPath ) }>
-					<ArrowLeft size={ 13 } /> { backLabel }
-				</button>
-				<ChevronRight size={ 11 } className="st-todox-td__bc-sep" />
-				<span className="st-todox-td__bc-current">{ task.title }</span>
-			</div>
+			{/* Breadcrumb — hidden in modal mode */}
+			{ ! isModal && (
+				<div className="st-todox-td__breadcrumb">
+					<button className="st-todox-td__bc-link" onClick={ () => navigate( backPath ) }>
+						<ArrowLeft size={ 13 } /> { backLabel }
+					</button>
+					<ChevronRight size={ 11 } className="st-todox-td__bc-sep" />
+					<span className="st-todox-td__bc-current">{ task.title }</span>
+				</div>
+			) }
 
 			<div className="st-todox-td__grid">
 
@@ -236,43 +534,119 @@ const TaskDetail = () => {
 						className="st-todox-td-card st-todox-td-card--header"
 						style={ { borderLeftColor: borderColor } }
 					>
-						{/* Top row: badges + actions */}
-						<div className="st-todox-td-card__top-row">
-							<div className="st-todox-td-card__badges">
-								<StatusBadge status={ task.status } />
-								<PriorityBadge priority={ task.priority } />
-								{ overdue && (
-									<span className="st-todox-td-overdue-chip">
-										<AlertCircle size={ 10 } /> Overdue
-									</span>
+						{ overdue && (
+							<div className="st-todox-td-card__overdue-row">
+								<span className="st-todox-td-overdue-chip">
+									<AlertCircle size={ 10 } /> Overdue
+								</span>
+							</div>
+						) }
+
+						{/* Title row: inline-editable title + delete button */}
+						<div className="st-todox-td-card__title-row">
+							{ editingTitle ? (
+								<input
+									className="st-todox-td-card__title-input"
+									value={ titleDraft }
+									onChange={ ( e ) => setTitleDraft( e.target.value ) }
+									autoFocus
+									onKeyDown={ ( e ) => {
+										if ( e.key === 'Enter' ) {
+											skipTitleBlur.current = true;
+											saveTitle();
+											setEditingTitle( false );
+										}
+										if ( e.key === 'Escape' ) {
+											skipTitleBlur.current = true;
+											setEditingTitle( false );
+										}
+									} }
+									onBlur={ () => {
+										if ( skipTitleBlur.current ) { skipTitleBlur.current = false; return; }
+										saveTitle();
+										setEditingTitle( false );
+									} }
+								/>
+							) : (
+								<h1
+									className={ `st-todox-td-card__title st-todox-td-card__title--editable ${ isCompleted ? 'st-todox-td-card__title--done' : '' }` }
+									onClick={ () => { setTitleDraft( task.title ); setEditingTitle( true ); } }
+									title="Click to edit title"
+								>
+									{ task.title }
+									<Pencil size={ 12 } className="st-todox-td-card__title-edit-icon" />
+								</h1>
+							) }
+							<button
+								className="st-todox-td-delete-btn"
+								onClick={ () => setDeleteTaskOpen( true ) }
+								title="Delete task"
+							>
+								<Trash2 size={ 14 } />
+							</button>
+						</div>
+
+						{/* Description — inline editable */}
+						{ editingDesc ? (
+							<div className="st-todox-td-card__desc-edit">
+								<textarea
+									className="st-todox-form__textarea"
+									rows={ 4 }
+									value={ descDraft }
+									onChange={ ( e ) => setDescDraft( e.target.value ) }
+									placeholder="Add a description…"
+									autoFocus
+									onKeyDown={ ( e ) => {
+										if ( e.key === 'Escape' ) {
+											skipDescBlur.current = true;
+											setEditingDesc( false );
+										}
+										if ( e.key === 'Enter' && ( e.metaKey || e.ctrlKey ) ) {
+											skipDescBlur.current = true;
+											saveDesc();
+											setEditingDesc( false );
+										}
+									} }
+									onBlur={ () => {
+										if ( skipDescBlur.current ) { skipDescBlur.current = false; return; }
+										saveDesc();
+										setEditingDesc( false );
+									} }
+								/>
+								<div className="st-todox-td-inline-desc-actions">
+									<span className="st-todox-td-inline-hint">⌘ + Enter to save · Esc to cancel</span>
+									<div style={ { display: 'flex', gap: 6 } }>
+										<button
+											className="st-todox-td-inline-btn st-todox-td-inline-btn--cancel"
+											onMouseDown={ ( e ) => { e.preventDefault(); skipDescBlur.current = true; setEditingDesc( false ); } }
+										>
+											Cancel
+										</button>
+										<button
+											className="st-todox-td-inline-btn st-todox-td-inline-btn--save"
+											onMouseDown={ ( e ) => { e.preventDefault(); skipDescBlur.current = true; saveDesc(); setEditingDesc( false ); } }
+										>
+											Save
+										</button>
+									</div>
+								</div>
+							</div>
+						) : (
+							<div
+								className="st-todox-td-card__desc-wrap st-todox-td-card__desc-wrap--editable"
+								onClick={ () => { setDescDraft( task.description ?? '' ); setEditingDesc( true ); } }
+								title="Click to edit description"
+							>
+								{ task.description ? (
+									<p className="st-todox-td-card__desc">{ task.description }</p>
+								) : (
+									<p className="st-todox-td-card__desc st-todox-td-card__desc--empty">
+										<Pencil size={ 11 } style={ { opacity: 0.5, marginRight: 4 } } />
+										Click to add a description…
+									</p>
 								) }
 							</div>
-							<div className="st-todox-td-card__actions">
-								<button className="st-todox-td-action-btn" onClick={ openEdit }>
-									<Edit3 size={ 13 } /> Edit Task
-								</button>
-								<button
-									className="st-todox-td-action-btn st-todox-td-action-btn--danger"
-									onClick={ () => setDeleteTaskOpen( true ) }
-								>
-									<Trash2 size={ 13 } />
-								</button>
-							</div>
-						</div>
-
-						{/* Title */}
-						<h1 className={ `st-todox-td-card__title ${ isCompleted ? 'st-todox-td-card__title--done' : '' }` }>
-							{ task.title }
-						</h1>
-
-						{/* Description */}
-						<div className="st-todox-td-card__desc-wrap">
-							{ task.description ? (
-								<p className="st-todox-td-card__desc">{ task.description }</p>
-							) : (
-								<p className="st-todox-td-card__desc st-todox-td-card__desc--empty">No description provided.</p>
-							) }
-						</div>
+						) }
 
 						{/* Labels */}
 						{ task.labels.length > 0 && (
@@ -326,89 +700,135 @@ const TaskDetail = () => {
 									</div>
 								) }
 
-								{ subtasks.length === 0 ? (
+								{ selectedSubtaskIds.size > 0 && (
+									<div className="st-todox-bulk-bar">
+										<span className="st-todox-bulk-bar__count">{ selectedSubtaskIds.size } selected</span>
+										<div className="st-todox-bulk-bar__actions">
+											<button
+												className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--danger"
+												onClick={ () => setBulkSubtaskConfirmOpen( true ) }
+												disabled={ bulkDeleteSubtasksMutation.isPending }
+											>
+												<Trash2 size={ 12 } /> Delete
+											</button>
+											<button
+												className="st-todox-bulk-bar__btn st-todox-bulk-bar__btn--ghost"
+												onClick={ () => setSelectedSubtaskIds( new Set() ) }
+											>
+												<X size={ 12 } /> Clear
+											</button>
+										</div>
+									</div>
+								) }
+
+								{ orderedSubtasks.length === 0 ? (
 									<div className="st-todox-td-empty">
 										<CircleDashed size={ 32 } className="st-todox-td-empty__icon" />
 										<p>No subtasks yet</p>
 									</div>
 								) : (
-									<div className="st-todox-td-subtask-list">
-										{ subtasks.map( ( st: Subtask ) => {
-											const statusColor = SUBTASK_STATUS_COLOR[ st.status ] ?? '#94a3b8';
-											const late = isOverdue( st.due_date ) && st.status !== 'done';
-											return (
-												<div key={ st.id } className="st-todox-td-subtask">
-													<input
-														type="checkbox"
-														className="st-todox-td-subtask__check"
-														checked={ st.completed }
-														onChange={ ( e ) =>
-															toggleSubtaskMutation.mutate( { subtaskId: st.id, completed: e.target.checked } )
-														}
-													/>
-
-													<div className="st-todox-td-subtask__body">
-														<span className={ `st-todox-td-subtask__title ${ st.completed ? 'st-todox-td-subtask__title--done' : '' }` }>
-															{ st.title }
-														</span>
-														{ st.description && (
-															<span className="st-todox-td-subtask__desc">{ st.description }</span>
-														) }
-													</div>
-
-													<div className="st-todox-td-subtask__meta">
-														<span
-															className="st-todox-td-subtask__status"
-															style={ { color: statusColor, background: statusColor + '18' } }
-														>
-															<Circle size={ 6 } fill="currentColor" />
-															{ SUBTASK_STATUS_LABEL[ st.status ] }
-														</span>
-														<span
-															className="st-todox-td-subtask__prio-dot"
-															style={ { background: PRIORITY_DOT[ st.priority ] ?? '#94a3b8' } }
-															title={ st.priority }
-														/>
-														{ st.due_date && (
-															<span className={ `st-todox-td-subtask__due ${ late ? 'st-todox-text--danger' : '' }` }>
-																{ formatDate( st.due_date ) }
-															</span>
-														) }
-														{ st.assignee && (
-															<Avatar name={ st.assignee.name } src={ st.assignee.avatar } size={ 18 } />
-														) }
-													</div>
-
-													<div className="st-todox-td-subtask__actions">
-														<button
-															className="st-todox-td-subtask__edit"
-															onClick={ () => { setEditingSubtask( st ); setSubtaskModalOpen( true ); } }
-															title="Edit"
-														>
-															<Edit3 size={ 11 } />
-														</button>
-														<button
-															className="st-todox-td-subtask__del"
-															onClick={ () => deleteSubtaskMutation.mutate( st.id ) }
-															title="Delete"
-														>
-															<X size={ 11 } />
-														</button>
-													</div>
-												</div>
-											);
-										} ) }
-									</div>
+									<DndContext
+										sensors={ subtaskSensors }
+										collisionDetection={ closestCenter }
+										onDragEnd={ handleSubtaskDragEnd }
+									>
+										<div className="st-todox-table-wrapper">
+											<table className="st-todox-table">
+												<thead>
+													<tr>
+														<th style={ { width: 32 } } />
+														<th className="st-todox-table__check-cell">
+																<input
+																	type="checkbox"
+																	ref={ selectAllSubRef }
+																	checked={ allSubtasksSelected }
+																	onChange={ toggleAllSubtasks }
+																/>
+															</th>
+														<th>Title</th>
+														<th>Status</th>
+														<th>Priority</th>
+														<th>Assignee</th>
+														<th>Due Date</th>
+														<th style={ { width: 40 } } />
+													</tr>
+												</thead>
+												<SortableContext
+													items={ orderedSubtasks.map( ( s ) => s.id ) }
+													strategy={ verticalListSortingStrategy }
+												>
+													<tbody>
+														{ orderedSubtasks.map( ( st ) => (
+															<SortableSubtaskRow
+																key={ st.id }
+																st={ st }
+																checked={ selectedSubtaskIds.has( st.id ) }
+																taskStatuses={ taskStatuses }
+																users={ users }
+																onSelect={ toggleSubtaskSelect }
+																onEdit={ ( s ) => { setEditingSubtask( s ); setSubtaskModalOpen( true ); } }
+																onDelete={ ( id ) => setDeleteSubtaskConfirmId( id ) }
+																onStatusChange={ handleSubtaskStatusChange }
+																onPriorityChange={ handleSubtaskPriorityChange }
+																onAssigneeChange={ handleSubtaskAssigneeChange }
+																onDueDateChange={ handleSubtaskDueDateChange }
+															/>
+														) ) }
+													</tbody>
+												</SortableContext>
+											</table>
+										</div>
+									</DndContext>
 								) }
 
-								{/* Add subtask button */}
-								<button
-									className="st-todox-td-subtask-add-btn"
-									onClick={ () => { setEditingSubtask( null ); setSubtaskModalOpen( true ); } }
-								>
-									<Plus size={ 13 } />
-									Add Subtask
-								</button>
+								{/* Inline add subtask */}
+								{ addingSubtask ? (
+									<div className="st-todox-inline-task-input">
+										<input
+											ref={ subtaskInputRef }
+											type="text"
+											className="st-todox-inline-task-input__field"
+											placeholder="Subtask name…"
+											value={ newSubtaskTitle }
+											onChange={ ( e ) => setNewSubtaskTitle( e.target.value ) }
+											autoFocus
+											disabled={ addSubtaskMutation.isPending }
+											onKeyDown={ ( e ) => {
+												if ( e.key === 'Enter' && newSubtaskTitle.trim() ) {
+													addSubtaskMutation.mutate( newSubtaskTitle.trim() );
+												}
+												if ( e.key === 'Escape' ) {
+													setNewSubtaskTitle( '' );
+													setAddingSubtask( false );
+												}
+											} }
+										/>
+										<button
+											className="st-todox-inline-task-input__btn st-todox-inline-task-input__btn--save"
+											onClick={ () => { if ( newSubtaskTitle.trim() ) addSubtaskMutation.mutate( newSubtaskTitle.trim() ); } }
+											disabled={ ! newSubtaskTitle.trim() || addSubtaskMutation.isPending }
+											title="Save (Enter)"
+										>
+											<Check size={ 13 } />
+										</button>
+										<button
+											className="st-todox-inline-task-input__btn st-todox-inline-task-input__btn--cancel"
+											onClick={ () => { setNewSubtaskTitle( '' ); setAddingSubtask( false ); } }
+											disabled={ addSubtaskMutation.isPending }
+											title="Cancel (Esc)"
+										>
+											<X size={ 13 } />
+										</button>
+									</div>
+								) : (
+									<button
+										className="st-todox-add-task-row"
+										onClick={ () => setAddingSubtask( true ) }
+									>
+										<Plus size={ 13 } />
+										Add Subtask
+									</button>
+								) }
 							</div>
 						) }
 
@@ -569,30 +989,147 @@ const TaskDetail = () => {
 						<div className="st-todox-td-meta-card__head">Task Details</div>
 						<div className="st-todox-td-meta-card__body">
 
+							{/* Status — inline picker */}
 							<div className="st-todox-td-meta-row">
-								<span className="st-todox-td-meta-row__label"><User size={ 13 } /> Assignee</span>
-								{ task.assignee ? (
-									<div className="st-todox-assignee">
-										<Avatar name={ task.assignee.name } src={ task.assignee.avatar } size={ 18 } />
-										<span className="st-todox-td-meta-row__val-bold">{ task.assignee.name }</span>
-									</div>
-								) : (
-									<span className="st-todox-td-meta-row__val-muted">
-										<span className="st-todox-td-meta-row__empty-circle" /> Unassigned
-									</span>
-								) }
+								<span className="st-todox-td-meta-row__label"><CircleDashed size={ 13 } /> Status</span>
+								<div className="st-todox-inline-picker">
+									<button
+										className="st-todox-inline-picker__trigger st-todox-inline-picker__trigger--meta"
+										onClick={ () => setStatusOpen( ( v ) => ! v ) }
+										title="Change status"
+									>
+										<StatusBadge status={ task.status } />
+										<ChevronDown size={ 10 } className="st-todox-inline-picker__chevron" />
+									</button>
+									{ statusOpen && (
+										<>
+											<div className="st-todox-inline-picker__backdrop" onClick={ () => setStatusOpen( false ) } />
+											<div className="st-todox-inline-picker__menu st-todox-inline-picker__menu--right">
+												{ taskStatuses.map( ( s ) => (
+													<button
+														key={ s.value }
+														className={ `st-todox-inline-picker__item ${ task.status === s.value ? 'st-todox-inline-picker__item--active' : '' }` }
+														onClick={ () => { inlineMutation.mutate( { status: s.value as TaskStatus } ); setStatusOpen( false ); } }
+													>
+														<StatusBadge status={ s.value as TaskStatus } />
+													</button>
+												) ) }
+											</div>
+										</>
+									) }
+								</div>
 							</div>
 
+							{/* Priority — inline picker */}
+							<div className="st-todox-td-meta-row">
+								<span className="st-todox-td-meta-row__label"><AlertCircle size={ 13 } /> Priority</span>
+								<div className="st-todox-inline-picker">
+									<button
+										className="st-todox-inline-picker__trigger st-todox-inline-picker__trigger--meta"
+										onClick={ () => setPriorityOpen( ( v ) => ! v ) }
+										title="Change priority"
+									>
+										<PriorityBadge priority={ task.priority } />
+										<ChevronDown size={ 10 } className="st-todox-inline-picker__chevron" />
+									</button>
+									{ priorityOpen && (
+										<>
+											<div className="st-todox-inline-picker__backdrop" onClick={ () => setPriorityOpen( false ) } />
+											<div className="st-todox-inline-picker__menu st-todox-inline-picker__menu--right">
+												{ ( [ 'low', 'medium', 'high', 'urgent' ] as TaskPriority[] ).map( ( p ) => (
+													<button
+														key={ p }
+														className={ `st-todox-inline-picker__item ${ task.priority === p ? 'st-todox-inline-picker__item--active' : '' }` }
+														onClick={ () => { inlineMutation.mutate( { priority: p } ); setPriorityOpen( false ); } }
+													>
+														<PriorityBadge priority={ p } />
+													</button>
+												) ) }
+											</div>
+										</>
+									) }
+								</div>
+							</div>
+
+							{/* Assignee — inline picker */}
+							<div className="st-todox-td-meta-row">
+								<span className="st-todox-td-meta-row__label"><User size={ 13 } /> Assignee</span>
+								<div className="st-todox-inline-picker">
+									<button
+										className="st-todox-inline-picker__trigger st-todox-inline-picker__trigger--meta"
+										onClick={ () => setAssigneeOpen( ( v ) => ! v ) }
+										title="Change assignee"
+									>
+										{ task.assignee ? (
+											<div className="st-todox-assignee">
+												<Avatar name={ task.assignee.name } src={ task.assignee.avatar } size={ 18 } />
+												<span className="st-todox-td-meta-row__val-bold">{ task.assignee.name }</span>
+											</div>
+										) : (
+											<span className="st-todox-td-meta-row__val-muted">
+												<span className="st-todox-td-meta-row__empty-circle" /> Unassigned
+											</span>
+										) }
+										<ChevronDown size={ 10 } className="st-todox-inline-picker__chevron" />
+									</button>
+									{ assigneeOpen && (
+										<>
+											<div className="st-todox-inline-picker__backdrop" onClick={ () => setAssigneeOpen( false ) } />
+											<div className="st-todox-inline-picker__menu st-todox-inline-picker__menu--right">
+												<button
+													className={ `st-todox-inline-picker__item ${ ! task.assignee_id ? 'st-todox-inline-picker__item--active' : '' }` }
+													onClick={ () => { inlineMutation.mutate( { assignee_id: null } as Partial<Task> ); setAssigneeOpen( false ); } }
+												>
+													<span className="st-todox-td-meta-row__empty-circle" style={ { marginRight: 4 } } />
+													Unassigned
+												</button>
+												{ users.map( ( u ) => (
+													<button
+														key={ u.id }
+														className={ `st-todox-inline-picker__item ${ task.assignee_id === u.id ? 'st-todox-inline-picker__item--active' : '' }` }
+														onClick={ () => { inlineMutation.mutate( { assignee_id: u.id } ); setAssigneeOpen( false ); } }
+													>
+														<Avatar name={ u.name } src={ u.avatar } size={ 16 } />
+														{ u.name }
+													</button>
+												) ) }
+											</div>
+										</>
+									) }
+								</div>
+							</div>
+
+							{/* Due date — inline date picker */}
 							<div className="st-todox-td-meta-row">
 								<span className="st-todox-td-meta-row__label"><Calendar size={ 13 } /> Due Date</span>
-								<span className={ `st-todox-td-meta-row__val-bold ${ overdue ? 'st-todox-text--danger' : '' }` }>
-									{ task.due_date ? formatDate( task.due_date ) : (
-										<span className="st-todox-td-meta-row__val-muted">Not set</span>
-									) }
-									{ overdue && (
-										<span className="st-todox-td-overdue-pill">Overdue</span>
-									) }
-								</span>
+								{ dueDateEditing ? (
+									<input
+										type="date"
+										className="st-todox-form__input st-todox-td-meta-date-input"
+										defaultValue={ task.due_date ?? '' }
+										autoFocus
+										onChange={ ( e ) => {
+											inlineMutation.mutate( { due_date: e.target.value || null } as Partial<Task> );
+											setDueDateEditing( false );
+										} }
+										onBlur={ () => setDueDateEditing( false ) }
+										onKeyDown={ ( e ) => { if ( e.key === 'Escape' ) setDueDateEditing( false ); } }
+									/>
+								) : (
+									<button
+										className="st-todox-inline-picker__trigger st-todox-inline-picker__trigger--meta"
+										onClick={ () => setDueDateEditing( true ) }
+										title="Set due date"
+									>
+										<span className={ `st-todox-td-meta-row__val-bold ${ overdue ? 'st-todox-text--danger' : '' }` }>
+											{ task.due_date ? formatDate( task.due_date ) : (
+												<span className="st-todox-td-meta-row__val-muted">Not set</span>
+											) }
+											{ overdue && <span className="st-todox-td-overdue-pill">Overdue</span> }
+										</span>
+										<Pencil size={ 11 } className="st-todox-inline-picker__chevron" />
+									</button>
+								) }
 							</div>
 
 							<div className="st-todox-td-meta-row">
@@ -645,126 +1182,8 @@ const TaskDetail = () => {
 						</div>
 					</div>
 
-					{/* Priority card */}
-					<div className="st-todox-td-priority-card">
-						<div
-							className="st-todox-td-priority-card__bar"
-							style={ { background: accentColor } }
-						/>
-						<div className="st-todox-td-priority-card__body">
-							<p className="st-todox-td-priority-card__label">Priority</p>
-							<PriorityBadge priority={ task.priority } />
-						</div>
-					</div>
 				</aside>
 			</div>
-
-			{/* Edit modal overlay */}
-			{ editOpen && (
-				<div className="st-todox-td-edit-overlay">
-					<div className="st-todox-td-edit-modal">
-						<div className="st-todox-td-edit-modal__head">
-							<h2>Edit Task</h2>
-							<button className="st-todox-td-edit-modal__close" onClick={ () => setEditOpen( false ) }>
-								<X size={ 16 } />
-							</button>
-						</div>
-						<div className="st-todox-td-edit-modal__body">
-							<div className="st-todox-form__group">
-								<label className="st-todox-form__label">Title</label>
-								<input
-									type="text"
-									className="st-todox-form__input"
-									value={ editForm.title ?? '' }
-									onChange={ ( e ) => setEditForm( { ...editForm, title: e.target.value } ) }
-									autoFocus
-								/>
-							</div>
-							<div className="st-todox-form__group">
-								<label className="st-todox-form__label">Description</label>
-								<textarea
-									className="st-todox-form__textarea"
-									rows={ 4 }
-									value={ editForm.description ?? '' }
-									onChange={ ( e ) => setEditForm( { ...editForm, description: e.target.value } ) }
-									placeholder="Add a description…"
-								/>
-							</div>
-							<div className="st-todox-form__row">
-								<div className="st-todox-form__group">
-									<label className="st-todox-form__label">Status</label>
-									<select
-										className="st-todox-form__select"
-										value={ editForm.status }
-										onChange={ ( e ) => setEditForm( { ...editForm, status: e.target.value as TaskStatus } ) }
-									>
-										{ taskStatuses.map( ( s ) => (
-											<option key={ s.value } value={ s.value }>{ s.label }</option>
-										) ) }
-									</select>
-								</div>
-								<div className="st-todox-form__group">
-									<label className="st-todox-form__label">Priority</label>
-									<select
-										className="st-todox-form__select"
-										value={ editForm.priority }
-										onChange={ ( e ) => setEditForm( { ...editForm, priority: e.target.value as TaskPriority } ) }
-									>
-										<option value="low">Low</option>
-										<option value="medium">Medium</option>
-										<option value="high">High</option>
-										<option value="urgent">Urgent</option>
-									</select>
-								</div>
-							</div>
-							<div className="st-todox-form__group">
-								<label className="st-todox-form__label">Due Date</label>
-								<input
-									type="date"
-									className="st-todox-form__input"
-									value={ editForm.due_date ?? '' }
-									onChange={ ( e ) => setEditForm( { ...editForm, due_date: e.target.value || null } ) }
-								/>
-							</div>
-							<div className="st-todox-form__group">
-								<label className="st-todox-form__label">Assignee</label>
-								<select
-									className="st-todox-form__select"
-									value={ editForm.assignee_id ?? '' }
-									onChange={ ( e ) => setEditForm( { ...editForm, assignee_id: e.target.value ? Number( e.target.value ) : null } ) }
-								>
-									<option value="">Unassigned</option>
-									{ users.map( ( u ) => (
-										<option key={ u.id } value={ u.id }>{ u.name }</option>
-									) ) }
-								</select>
-							</div>
-						</div>
-						{ task.project_id && (
-							<div className="st-todox-form__group">
-								<label className="st-todox-form__label">Sprint</label>
-								<select
-									className="st-todox-form__select"
-									value={ editForm.sprint_id ?? '' }
-									onChange={ ( e ) => setEditForm( { ...editForm, sprint_id: e.target.value ? Number( e.target.value ) : null } ) }
-									disabled={ sprintsLoading }
-								>
-									<option value="">{ sprintsLoading ? 'Loading…' : 'No sprint (backlog)' }</option>
-									{ sprints.map( ( s ) => (
-										<option key={ s.id } value={ s.id }>{ s.name }</option>
-									) ) }
-								</select>
-							</div>
-						) }
-						<div className="st-todox-td-edit-modal__footer">
-							<Button variant="secondary" onClick={ () => setEditOpen( false ) }>Cancel</Button>
-							<Button onClick={ () => updateMutation.mutate( editForm ) } loading={ updateMutation.isPending }>
-								Save Changes
-							</Button>
-						</div>
-					</div>
-				</div>
-			) }
 
 			<ConfirmDialog
 				isOpen={ deleteTaskOpen }
@@ -785,10 +1204,30 @@ const TaskDetail = () => {
 				loading={ deleteCommentMutation.isPending }
 			/>
 
+			<ConfirmDialog
+				isOpen={ !! deleteSubtaskConfirmId }
+				onClose={ () => setDeleteSubtaskConfirmId( null ) }
+				onConfirm={ () => deleteSubtaskConfirmId && deleteSubtaskMutation.mutate( deleteSubtaskConfirmId ) }
+				message="Delete this subtask? This cannot be undone."
+				confirmLabel="Delete"
+				loading={ deleteSubtaskMutation.isPending }
+			/>
+
+			<ConfirmDialog
+				isOpen={ bulkSubtaskConfirmOpen }
+				onClose={ () => setBulkSubtaskConfirmOpen( false ) }
+				onConfirm={ () => bulkDeleteSubtasksMutation.mutate( [ ...selectedSubtaskIds ] ) }
+				title="Delete Subtasks"
+				message={ `Delete ${ selectedSubtaskIds.size } selected subtask${ selectedSubtaskIds.size !== 1 ? 's' : '' }? This cannot be undone.` }
+				confirmLabel="Delete"
+				loading={ bulkDeleteSubtasksMutation.isPending }
+			/>
+
 			<SubtaskModal
 				isOpen={ subtaskModalOpen }
 				onClose={ () => { setSubtaskModalOpen( false ); setEditingSubtask( null ); } }
 				taskId={ taskId }
+				workspaceId={ task?.workspace_id ?? 0 }
 				subtask={ editingSubtask ?? undefined }
 				onSaved={ () => { qc.invalidateQueries( { queryKey: [ 'tasks', taskId ] } ); } }
 			/>

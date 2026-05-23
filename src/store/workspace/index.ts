@@ -19,7 +19,7 @@ interface State {
 const DEFAULT_STATE: State = {
 	activeWorkspaceId: parseInt( localStorage.getItem( 'st_todox_workspace_id' ) ?? '0', 10 ) || null,
 	activeWorkspace: null,
-	sidebarOpen: true,
+	sidebarOpen: localStorage.getItem( 'st_todox_sidebar_open' ) !== 'false',
 	viewMode: ( localStorage.getItem( 'st_todox_view_mode' ) as State[ 'viewMode' ] ) || 'list',
 };
 
@@ -60,8 +60,11 @@ function reducer( state = DEFAULT_STATE, action: Action ): State {
 			localStorage.removeItem( 'st_todox_workspace_id' );
 			return { ...state, activeWorkspaceId: null, activeWorkspace: null };
 
-		case 'TOGGLE_SIDEBAR':
-			return { ...state, sidebarOpen: ! state.sidebarOpen };
+		case 'TOGGLE_SIDEBAR': {
+			const next = ! state.sidebarOpen;
+			localStorage.setItem( 'st_todox_sidebar_open', String( next ) );
+			return { ...state, sidebarOpen: next };
+		}
 
 		case 'SET_VIEW_MODE':
 			localStorage.setItem( 'st_todox_view_mode', action.mode );

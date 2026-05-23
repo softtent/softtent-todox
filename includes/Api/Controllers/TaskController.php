@@ -4,6 +4,7 @@ namespace SoftTent\TodoX\Api\Controllers;
 
 defined( 'ABSPATH' ) || exit;
 
+use WP_Error;
 use SoftTent\TodoX\Abstracts\RestApi;
 use SoftTent\TodoX\Models\Task;
 use SoftTent\TodoX\Models\TaskComment;
@@ -33,17 +34,60 @@ class TaskController extends RestApi {
 	protected $base = 'tasks';
 
 	public function routes(): void {
+		$by_workspace_param = function ( \WP_REST_Request $req ) {
+			return $this->can_access_workspace( (int) ( $req->get_param( 'workspace_id' ) ?? 0 ) );
+		};
+
+		$by_task_id = function ( \WP_REST_Request $req ) {
+			$workspace_id = Task::get_workspace_id( (int) $req->get_param( 'id' ) );
+			if ( $workspace_id === null ) {
+				return new WP_Error(
+					'rest_task_not_found',
+					esc_html__( 'Task not found.', 'softtent-todox' ),
+					[ 'status' => 404 ]
+				);
+			}
+			return $this->can_access_workspace( $workspace_id );
+		};
+
+		$by_reorder_items = function ( \WP_REST_Request $req ) {
+			$items = $req->get_param( 'items' );
+			if ( ! is_array( $items ) || empty( $items ) ) {
+				return new WP_Error(
+					'rest_invalid_items',
+					esc_html__( 'Items array is required.', 'softtent-todox' ),
+					[ 'status' => 400 ]
+				);
+			}
+
+			$ids = array_filter( array_map( static fn( $i ) => isset( $i['id'] ) ? (int) $i['id'] : 0, $items ) );
+			if ( empty( $ids ) ) {
+				return new WP_Error( 'rest_invalid_items', esc_html__( 'Items array is required.', 'softtent-todox' ), [ 'status' => 400 ] );
+			}
+
+			$ws_ids = array_unique( array_values( Task::get_workspace_ids( $ids ) ) );
+			if ( count( $ws_ids ) !== 1 ) {
+				return new WP_Error(
+					'rest_forbidden',
+					esc_html__( 'Tasks must belong to a single workspace.', 'softtent-todox' ),
+					[ 'status' => 403 ]
+				);
+			}
+
+			return $this->can_access_workspace( (int) $ws_ids[0] );
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base, [
 				[
 					'methods'             => 'GET',
 					'callback'            => [ $this, 'index' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_workspace_param,
 				],
 				[
 					'methods'             => 'POST',
 					'callback'            => [ $this, 'store' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_workspace_param,
 				],
 			]
         );
@@ -53,7 +97,7 @@ class TaskController extends RestApi {
 				[
 					'methods'             => 'POST',
 					'callback'            => [ $this, 'reorder' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_reorder_items,
 				],
 			]
         );
@@ -63,17 +107,17 @@ class TaskController extends RestApi {
 				[
 					'methods'             => 'GET',
 					'callback'            => [ $this, 'show' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 				[
 					'methods'             => 'PUT',
 					'callback'            => [ $this, 'update' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 				[
 					'methods'             => 'DELETE',
 					'callback'            => [ $this, 'destroy' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 			]
         );
@@ -83,12 +127,12 @@ class TaskController extends RestApi {
 				[
 					'methods'             => 'GET',
 					'callback'            => [ $this, 'get_comments' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 				[
 					'methods'             => 'POST',
 					'callback'            => [ $this, 'add_comment' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 			]
         );
@@ -98,12 +142,12 @@ class TaskController extends RestApi {
 				[
 					'methods'             => 'PUT',
 					'callback'            => [ $this, 'update_comment' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 				[
 					'methods'             => 'DELETE',
 					'callback'            => [ $this, 'delete_comment' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 			]
         );
@@ -113,18 +157,23 @@ class TaskController extends RestApi {
 				[
 					'methods'             => 'GET',
 					'callback'            => [ $this, 'get_activities' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 			]
         );
 	}
 
 	public function index( \WP_REST_Request $req ): \WP_REST_Response {
-		$pagination = Fns::get_pagination( $req );
+		$pagination   = Fns::get_pagination( $req );
+		$workspace_id = (int) $req->get_param( 'workspace_id' );
+
+		if ( $workspace_id <= 0 ) {
+			return $this->error( esc_html__( 'Workspace is required.', 'softtent-todox' ) );
+		}
 
 		$result = Task::get_all(
             [
-				'workspace_id' => $req->get_param( 'workspace_id' ),
+				'workspace_id' => $workspace_id,
 				'project_id'   => $req->get_param( 'project_id' ),
 				'sprint_id'    => $req->get_param( 'sprint_id' ),
 				'status'       => $req->get_param( 'status' ),
@@ -138,25 +187,44 @@ class TaskController extends RestApi {
 			]
         );
 
-		// Attach labels to list items.
+		// Batch-attach labels and subtask counts to list items.
+		$ids      = array_map( static fn( $t ) => (int) $t['id'], $result['items'] );
+		$subtasks = Task::get_subtask_counts_for( $ids );
+
+		// Collect all unique label taxonomy IDs across all tasks, resolve once.
+		$all_label_ids = array_values( array_unique( array_merge( ...array_map( static fn( $t ) => $t['label_ids'] ?? [], $result['items'] ) ) ) );
+		$label_map     = [];
+		foreach ( Task::resolve_labels( $all_label_ids ) as $label ) {
+			$label_map[ $label['id'] ] = $label;
+		}
+
 		foreach ( $result['items'] as &$task ) {
-			$task['labels'] = Task::get_labels( $task['id'] );
+			$task['labels']         = array_values( array_filter( array_map( static fn( $id ) => $label_map[ $id ] ?? null, $task['label_ids'] ?? [] ) ) );
+			$task['subtask_counts'] = $subtasks[ (int) $task['id'] ] ?? [
+				'total'     => 0,
+				'completed' => 0,
+			];
 		}
 		unset( $task );
 
+		$per_page = (int) $pagination['per_page'];
+
 		return $this->ok(
             [
-				'items'      => $result['items'],
-				'total'      => $result['total'],
-				'page'       => $pagination['page'],
-				'per_page'   => $pagination['per_page'],
-				'total_pages' => (int) ceil( $result['total'] / $pagination['per_page'] ),
+				'items'       => $result['items'],
+				'total'       => $result['total'],
+				'page'        => $pagination['page'],
+				'per_page'    => $per_page,
+				'total_pages' => $per_page > 0 ? (int) ceil( $result['total'] / $per_page ) : 0,
 			]
         );
 	}
 
 	public function show( \WP_REST_Request $req ): \WP_REST_Response {
-		$task = Task::get( (int) $req->get_param( 'id' ) );
+		$task = Task::get(
+			(int) $req->get_param( 'id' ),
+			[ 'subtasks', 'comments', 'activities' ]
+		);
 
 		if ( ! $task ) {
 			return $this->error( esc_html__( 'Task not found.', 'softtent-todox' ), 404 );
@@ -166,6 +234,12 @@ class TaskController extends RestApi {
 	}
 
 	public function store( \WP_REST_Request $req ): \WP_REST_Response {
+		$workspace_id = (int) $req->get_param( 'workspace_id' );
+
+		if ( ! $workspace_id ) {
+			return $this->error( esc_html__( 'Workspace is required.', 'softtent-todox' ) );
+		}
+
 		$title = $this->sanitize_text( $req->get_param( 'title' ) ?? '' );
 
 		if ( empty( $title ) ) {
@@ -173,13 +247,21 @@ class TaskController extends RestApi {
 		}
 
 		$id = Task::create(
-            array_merge(
-                $req->get_params(),
-                [
-					'title'      => $title,
-					'creator_id' => $this->current_user_id(),
-                ]
-            )
+            [
+				'workspace_id' => $workspace_id,
+				'project_id'   => $req->get_param( 'project_id' ),
+				'sprint_id'    => $req->get_param( 'sprint_id' ),
+				'title'        => $title,
+				'description'  => $req->get_param( 'description' ),
+				'status'       => $req->get_param( 'status' ),
+				'status_id'    => $req->get_param( 'status_id' ),
+				'priority'     => $req->get_param( 'priority' ) ?? 'medium',
+				'start_date'   => $req->get_param( 'start_date' ),
+				'due_date'     => $req->get_param( 'due_date' ),
+				'assignee_id'  => $req->get_param( 'assignee_id' ),
+				'label_ids'    => $req->get_param( 'label_ids' ),
+				'creator_id'   => $this->current_user_id(),
+            ]
         );
 
 		if ( ! $id ) {
@@ -191,7 +273,7 @@ class TaskController extends RestApi {
 
 	public function update( \WP_REST_Request $req ): \WP_REST_Response {
 		$id   = (int) $req->get_param( 'id' );
-		$task = Task::get( $id );
+		$task = Task::get( $id, [] );
 
 		if ( ! $task ) {
 			return $this->error( esc_html__( 'Task not found.', 'softtent-todox' ), 404 );
@@ -204,7 +286,7 @@ class TaskController extends RestApi {
 
 	public function destroy( \WP_REST_Request $req ): \WP_REST_Response {
 		$id   = (int) $req->get_param( 'id' );
-		$task = Task::get( $id );
+		$task = Task::get( $id, [] );
 
 		if ( ! $task ) {
 			return $this->error( esc_html__( 'Task not found.', 'softtent-todox' ), 404 );
@@ -218,11 +300,15 @@ class TaskController extends RestApi {
 	public function reorder( \WP_REST_Request $req ): \WP_REST_Response {
 		$items = $req->get_param( 'items' );
 
-		if ( ! is_array( $items ) ) {
+		if ( ! is_array( $items ) || empty( $items ) ) {
 			return $this->error( esc_html__( 'Items array is required.', 'softtent-todox' ) );
 		}
 
-		Task::reorder( $items );
+		// Permission check already verified all items belong to one workspace.
+		$first_id     = (int) ( $items[0]['id'] ?? 0 );
+		$workspace_id = (int) Task::get_workspace_id( $first_id );
+
+		Task::reorder( $items, $workspace_id );
 
 		return $this->ok( null, esc_html__( 'Tasks reordered.', 'softtent-todox' ) );
 	}

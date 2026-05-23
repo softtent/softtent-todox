@@ -6,7 +6,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
-	Zap, Calendar, Circle, Clock, AlertCircle, CheckCircle2, ArrowLeft, ChevronRight,
+	type LucideIcon,
+	Zap, Calendar, Circle, Clock, AlertCircle, CheckCircle2, ArrowLeft,
 } from 'lucide-react';
 
 /**
@@ -41,7 +42,7 @@ const TASK_STATUS_LABELS: Record<TStatus, string> = {
 	completed:   'Completed',
 };
 
-const TASK_STATUS_ICONS: Record<TStatus, React.ComponentType<{ size?: number; className?: string }>> = {
+const TASK_STATUS_ICONS: Record<TStatus, LucideIcon> = {
 	todo:        Circle,
 	in_progress: Clock,
 	review:      AlertCircle,
@@ -79,8 +80,8 @@ const SprintDetail = () => {
 
 	const { data: tasksData, isLoading: tasksLoading } = useQuery( {
 		queryKey: [ 'tasks', 'sprint', sprintId ],
-		queryFn: () => tasksApi.getAll( { sprint_id: sprintId, per_page: 100 } ),
-		enabled: !! sprintId,
+		queryFn: () => tasksApi.getAll( { workspace_id: activeWorkspaceId!, sprint_id: sprintId, per_page: 100 } ),
+		enabled: !! sprintId && !! activeWorkspaceId,
 	} );
 	const tasks = tasksData?.items ?? [];
 

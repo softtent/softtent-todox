@@ -141,6 +141,7 @@ class Manager {
 			return;
 		}
 
+		wp_enqueue_style( 'wp-components' );
 		wp_enqueue_style( 'softtent-todox' );
 		wp_enqueue_script( 'softtent-todox' );
 		wp_localize_script( 'softtent-todox', 'stTodoxParams', $this->get_script_data() );

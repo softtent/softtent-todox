@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-05-22T17:32:46+00:00\n"
+"POT-Creation-Date: 2026-05-27T09:04:26+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.11.0\n"
 "X-Domain: softtent-todox\n"
@@ -39,25 +39,24 @@ msgstr ""
 msgid "https://softtent.com"
 msgstr ""
 
-#: dist/includes/Abstracts/RestApi.php:50
 #: includes/Abstracts/RestApi.php:50
 msgid "Sorry, you are not allowed to do that."
 msgstr ""
 
-#: dist/includes/Abstracts/RestApi.php:67
 #: includes/Abstracts/RestApi.php:67
+#: includes/Abstracts/RestApi.php:101
 msgid "Authentication required."
 msgstr ""
 
-#: dist/includes/Abstracts/RestApi.php:81
 #: includes/Abstracts/RestApi.php:81
+#: includes/Abstracts/RestApi.php:121
 msgid "You are not a member of this workspace."
 msgstr ""
 
-#: dist/includes/Admin/Menu.php:31
-#: dist/includes/Admin/Menu.php:32
-#: dist/includes/Frontend/App.php:43
-#: dist/templates/app.php:8
+#: includes/Abstracts/RestApi.php:113
+msgid "Workspace context is required."
+msgstr ""
+
 #: includes/Admin/Menu.php:31
 #: includes/Admin/Menu.php:32
 #: includes/Frontend/App.php:43
@@ -65,339 +64,309 @@ msgstr ""
 msgid "TodoX"
 msgstr ""
 
-#: dist/includes/Api/Controllers/DashboardController.php:58
-#: dist/includes/Api/Controllers/DashboardController.php:77
-#: dist/includes/Api/Controllers/DashboardController.php:105
-#: dist/includes/Api/Controllers/DepartmentController.php:63
-#: dist/includes/Api/Controllers/DepartmentController.php:89
-#: dist/includes/Api/Controllers/ProjectController.php:63
-#: dist/includes/Api/Controllers/TaxonomyController.php:68
-#: dist/includes/Api/Controllers/TeamController.php:88
-#: includes/Api/Controllers/DashboardController.php:58
-#: includes/Api/Controllers/DashboardController.php:77
-#: includes/Api/Controllers/DashboardController.php:105
-#: includes/Api/Controllers/DepartmentController.php:63
-#: includes/Api/Controllers/DepartmentController.php:89
-#: includes/Api/Controllers/ProjectController.php:63
+#: includes/Api/Controllers/DashboardController.php:57
+#: includes/Api/Controllers/DashboardController.php:76
+#: includes/Api/Controllers/DashboardController.php:104
+#: includes/Api/Controllers/DepartmentController.php:83
+#: includes/Api/Controllers/DepartmentController.php:109
+#: includes/Api/Controllers/ProjectController.php:83
 #: includes/Api/Controllers/TaxonomyController.php:68
-#: includes/Api/Controllers/TeamController.php:88
+#: includes/Api/Controllers/TeamController.php:108
 msgid "workspace_id is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/DepartmentController.php:78
-#: includes/Api/Controllers/DepartmentController.php:78
+#: includes/Api/Controllers/DepartmentController.php:26
+#: includes/Api/Controllers/DepartmentController.php:137
+#: includes/Api/Controllers/ProjectController.php:26
+#: includes/Api/Controllers/ProjectController.php:164
+#: includes/Api/Controllers/SprintController.php:26
+#: includes/Api/Controllers/SprintController.php:149
+#: includes/Api/Controllers/SubtaskController.php:110
+#: includes/Api/Controllers/TaskController.php:58
+#: includes/Api/Controllers/TaskController.php:65
+#: includes/Api/Controllers/TaskController.php:304
+#: includes/Api/Controllers/TeamController.php:26
+#: includes/Api/Controllers/TeamController.php:189
+msgid "Items array is required."
+msgstr ""
+
+#: includes/Api/Controllers/DepartmentController.php:98
 msgid "Department not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/DepartmentController.php:85
-#: includes/Api/Controllers/DepartmentController.php:85
+#: includes/Api/Controllers/DepartmentController.php:105
 msgid "Department name is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/DepartmentController.php:95
-#: includes/Api/Controllers/DepartmentController.php:95
+#: includes/Api/Controllers/DepartmentController.php:115
 msgid "Department created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/DepartmentController.php:96
-#: includes/Api/Controllers/DepartmentController.php:96
+#: includes/Api/Controllers/DepartmentController.php:116
 msgid "Failed to create department."
 msgstr ""
 
-#: dist/includes/Api/Controllers/DepartmentController.php:104
-#: includes/Api/Controllers/DepartmentController.php:104
+#: includes/Api/Controllers/DepartmentController.php:124
 msgid "Department updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/DepartmentController.php:110
-#: includes/Api/Controllers/DepartmentController.php:110
+#: includes/Api/Controllers/DepartmentController.php:130
 msgid "Department deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/NotificationController.php:79
+#: includes/Api/Controllers/DepartmentController.php:142
+msgid "Departments reordered."
+msgstr ""
+
 #: includes/Api/Controllers/NotificationController.php:79
 msgid "Notification marked as read."
 msgstr ""
 
-#: dist/includes/Api/Controllers/NotificationController.php:85
 #: includes/Api/Controllers/NotificationController.php:85
 msgid "All notifications marked as read."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:82
-#: includes/Api/Controllers/ProjectController.php:82
+#: includes/Api/Controllers/ProjectController.php:102
 msgid "Project not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:91
-#: includes/Api/Controllers/ProjectController.php:91
+#: includes/Api/Controllers/ProjectController.php:111
 msgid "Project name is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:95
-#: includes/Api/Controllers/ProjectController.php:95
+#: includes/Api/Controllers/ProjectController.php:115
 msgid "Workspace ID is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:99
-#: includes/Api/Controllers/ProjectController.php:99
-msgid "Team ID is required."
+#: includes/Api/Controllers/ProjectController.php:119
+msgid "At least one team is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:117
-#: includes/Api/Controllers/ProjectController.php:117
+#: includes/Api/Controllers/ProjectController.php:137
 msgid "Project created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:118
-#: includes/Api/Controllers/ProjectController.php:118
+#: includes/Api/Controllers/ProjectController.php:138
 msgid "Failed to create project."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:126
-#: includes/Api/Controllers/ProjectController.php:126
+#: includes/Api/Controllers/ProjectController.php:151
 msgid "Project updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/ProjectController.php:132
-#: includes/Api/Controllers/ProjectController.php:132
+#: includes/Api/Controllers/ProjectController.php:157
 msgid "Project deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SettingsController.php:68
-#: includes/Api/Controllers/SettingsController.php:68
+#: includes/Api/Controllers/ProjectController.php:169
+msgid "Projects reordered."
+msgstr ""
+
+#: includes/Api/Controllers/SettingsController.php:75
 msgid "Settings saved."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SprintController.php:63
-#: dist/includes/Api/Controllers/SprintController.php:91
-#: includes/Api/Controllers/SprintController.php:63
-#: includes/Api/Controllers/SprintController.php:91
+#: includes/Api/Controllers/SprintController.php:83
+#: includes/Api/Controllers/SprintController.php:111
 msgid "project_id is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SprintController.php:80
-#: includes/Api/Controllers/SprintController.php:80
+#: includes/Api/Controllers/SprintController.php:100
 msgid "Sprint not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SprintController.php:87
-#: includes/Api/Controllers/SprintController.php:87
+#: includes/Api/Controllers/SprintController.php:107
 msgid "Sprint name is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SprintController.php:97
-#: includes/Api/Controllers/SprintController.php:97
+#: includes/Api/Controllers/SprintController.php:127
 msgid "Sprint created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SprintController.php:98
-#: includes/Api/Controllers/SprintController.php:98
+#: includes/Api/Controllers/SprintController.php:128
 msgid "Failed to create sprint."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SprintController.php:106
-#: includes/Api/Controllers/SprintController.php:106
+#: includes/Api/Controllers/SprintController.php:136
 msgid "Sprint updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SprintController.php:112
-#: includes/Api/Controllers/SprintController.php:112
+#: includes/Api/Controllers/SprintController.php:142
 msgid "Sprint deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SubtaskController.php:70
-#: includes/Api/Controllers/SubtaskController.php:70
+#: includes/Api/Controllers/SprintController.php:154
+msgid "Sprints reordered."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:80
 msgid "Subtask not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SubtaskController.php:78
-#: includes/Api/Controllers/SubtaskController.php:78
+#: includes/Api/Controllers/SubtaskController.php:88
 msgid "Subtask title is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SubtaskController.php:84
-#: includes/Api/Controllers/SubtaskController.php:84
+#: includes/Api/Controllers/SubtaskController.php:94
 msgid "Subtask created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SubtaskController.php:85
-#: includes/Api/Controllers/SubtaskController.php:85
+#: includes/Api/Controllers/SubtaskController.php:95
 msgid "Failed to create subtask."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SubtaskController.php:93
-#: includes/Api/Controllers/SubtaskController.php:93
+#: includes/Api/Controllers/SubtaskController.php:103
 msgid "Subtask updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/SubtaskController.php:99
-#: includes/Api/Controllers/SubtaskController.php:99
+#: includes/Api/Controllers/SubtaskController.php:115
+msgid "Subtasks reordered."
+msgstr ""
+
+#: includes/Api/Controllers/SubtaskController.php:121
 msgid "Subtask deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:162
-#: dist/includes/Api/Controllers/TaskController.php:197
-#: dist/includes/Api/Controllers/TaskController.php:210
-#: includes/Api/Controllers/TaskController.php:162
-#: includes/Api/Controllers/TaskController.php:197
-#: includes/Api/Controllers/TaskController.php:210
+#: includes/Api/Controllers/TaskController.php:46
+#: includes/Api/Controllers/TaskController.php:230
+#: includes/Api/Controllers/TaskController.php:279
+#: includes/Api/Controllers/TaskController.php:292
 msgid "Task not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:172
-#: includes/Api/Controllers/TaskController.php:172
+#: includes/Api/Controllers/TaskController.php:72
+msgid "Tasks must belong to a single workspace."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:171
+#: includes/Api/Controllers/TaskController.php:240
+msgid "Workspace is required."
+msgstr ""
+
+#: includes/Api/Controllers/TaskController.php:246
 msgid "Task title is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:186
-#: includes/Api/Controllers/TaskController.php:186
+#: includes/Api/Controllers/TaskController.php:268
 msgid "Failed to create task."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:189
-#: includes/Api/Controllers/TaskController.php:189
+#: includes/Api/Controllers/TaskController.php:271
 msgid "Task created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:202
-#: includes/Api/Controllers/TaskController.php:202
+#: includes/Api/Controllers/TaskController.php:284
 msgid "Task updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:215
-#: includes/Api/Controllers/TaskController.php:215
+#: includes/Api/Controllers/TaskController.php:297
 msgid "Task deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:222
-#: includes/Api/Controllers/TaskController.php:222
-msgid "Items array is required."
-msgstr ""
-
-#: dist/includes/Api/Controllers/TaskController.php:227
-#: includes/Api/Controllers/TaskController.php:227
+#: includes/Api/Controllers/TaskController.php:313
 msgid "Tasks reordered."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:239
-#: includes/Api/Controllers/TaskController.php:239
+#: includes/Api/Controllers/TaskController.php:325
 msgid "Comment content is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:246
-#: includes/Api/Controllers/TaskController.php:246
+#: includes/Api/Controllers/TaskController.php:332
 msgid "Comment added."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:257
-#: includes/Api/Controllers/TaskController.php:257
+#: includes/Api/Controllers/TaskController.php:343
 msgid "Comment updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaskController.php:265
-#: includes/Api/Controllers/TaskController.php:265
+#: includes/Api/Controllers/TaskController.php:351
 msgid "Comment deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaxonomyController.php:78
-#: includes/Api/Controllers/TaxonomyController.php:78
+#: includes/Api/Controllers/TaxonomyController.php:81
 msgid "Taxonomy name is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaxonomyController.php:84
-#: includes/Api/Controllers/TaxonomyController.php:84
+#: includes/Api/Controllers/TaxonomyController.php:87
+msgid "Invalid taxonomy type."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:96
+msgid "workspace_id is required for workspace-scoped taxonomies."
+msgstr ""
+
+#: includes/Api/Controllers/TaxonomyController.php:113
 msgid "Taxonomy created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaxonomyController.php:85
-#: includes/Api/Controllers/TaxonomyController.php:85
+#: includes/Api/Controllers/TaxonomyController.php:114
 msgid "Failed to create taxonomy."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaxonomyController.php:93
-#: includes/Api/Controllers/TaxonomyController.php:93
+#: includes/Api/Controllers/TaxonomyController.php:122
 msgid "Taxonomy updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaxonomyController.php:99
-#: includes/Api/Controllers/TaxonomyController.php:99
+#: includes/Api/Controllers/TaxonomyController.php:128
 msgid "Taxonomy deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaxonomyController.php:106
-#: includes/Api/Controllers/TaxonomyController.php:106
+#: includes/Api/Controllers/TaxonomyController.php:135
 msgid "items must be an array."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TaxonomyController.php:111
-#: includes/Api/Controllers/TaxonomyController.php:111
+#: includes/Api/Controllers/TaxonomyController.php:140
 msgid "Taxonomies reordered."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:105
-#: includes/Api/Controllers/TeamController.php:105
+#: includes/Api/Controllers/TeamController.php:125
 msgid "Team not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:117
-#: includes/Api/Controllers/TeamController.php:117
+#: includes/Api/Controllers/TeamController.php:137
 msgid "Team name is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:123
-#: includes/Api/Controllers/TeamController.php:123
+#: includes/Api/Controllers/TeamController.php:143
 msgid "Team created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:124
-#: includes/Api/Controllers/TeamController.php:124
+#: includes/Api/Controllers/TeamController.php:144
 msgid "Failed to create team."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:132
-#: includes/Api/Controllers/TeamController.php:132
+#: includes/Api/Controllers/TeamController.php:152
 msgid "Team updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:138
-#: includes/Api/Controllers/TeamController.php:138
+#: includes/Api/Controllers/TeamController.php:158
 msgid "Team deleted."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:151
-#: dist/includes/Api/Controllers/WorkspaceController.php:195
-#: includes/Api/Controllers/TeamController.php:151
+#: includes/Api/Controllers/TeamController.php:171
 #: includes/Api/Controllers/WorkspaceController.php:195
 msgid "User not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:156
-#: dist/includes/Api/Controllers/WorkspaceController.php:200
-#: includes/Api/Controllers/TeamController.php:156
+#: includes/Api/Controllers/TeamController.php:176
 #: includes/Api/Controllers/WorkspaceController.php:200
 msgid "Member added."
 msgstr ""
 
-#: dist/includes/Api/Controllers/TeamController.php:162
-#: dist/includes/Api/Controllers/WorkspaceController.php:213
-#: includes/Api/Controllers/TeamController.php:162
+#: includes/Api/Controllers/TeamController.php:182
 #: includes/Api/Controllers/WorkspaceController.php:213
 msgid "Member removed."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:109
-#: dist/includes/Api/Controllers/WorkspaceController.php:163
+#: includes/Api/Controllers/TeamController.php:194
+msgid "Teams reordered."
+msgstr ""
+
 #: includes/Api/Controllers/WorkspaceController.php:109
 #: includes/Api/Controllers/WorkspaceController.php:163
 msgid "Workspace not found."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:113
-#: dist/includes/Api/Controllers/WorkspaceController.php:150
-#: dist/includes/Api/Controllers/WorkspaceController.php:179
-#: dist/includes/Api/Controllers/WorkspaceController.php:191
-#: dist/includes/Api/Controllers/WorkspaceController.php:208
 #: includes/Api/Controllers/WorkspaceController.php:113
 #: includes/Api/Controllers/WorkspaceController.php:150
 #: includes/Api/Controllers/WorkspaceController.php:179
@@ -406,37 +375,30 @@ msgstr ""
 msgid "Access denied."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:126
 #: includes/Api/Controllers/WorkspaceController.php:126
 msgid "Workspace name is required."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:140
 #: includes/Api/Controllers/WorkspaceController.php:140
 msgid "Failed to create workspace."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:143
 #: includes/Api/Controllers/WorkspaceController.php:143
 msgid "Workspace created."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:155
 #: includes/Api/Controllers/WorkspaceController.php:155
 msgid "Workspace updated."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:167
 #: includes/Api/Controllers/WorkspaceController.php:167
 msgid "Only the workspace owner can delete it."
 msgstr ""
 
-#: dist/includes/Api/Controllers/WorkspaceController.php:172
 #: includes/Api/Controllers/WorkspaceController.php:172
 msgid "Workspace deleted."
 msgstr ""
 
-#: dist/includes/Hooks/Manager.php:32
 #: includes/Hooks/Manager.php:32
 msgid "Manage TodoX"
 msgstr ""

@@ -85,6 +85,48 @@ abstract class RestApi extends WP_REST_Controller {
 	}
 
 	/**
+	 * Permission check: user must be a member of the given workspace.
+	 *
+	 * Unlike is_workspace_member(), this REQUIRES a workspace ID and denies
+	 * by default. Use this from route closures that resolve the workspace
+	 * from the target resource (task, comment, etc.) instead of from request
+	 * params, so callers cannot bypass the check by omitting workspace_id.
+	 *
+	 * @since 0.2.0
+	 */
+	protected function can_access_workspace( int $workspace_id ): bool|WP_Error {
+		if ( ! is_user_logged_in() ) {
+			return new WP_Error(
+				'rest_not_logged_in',
+				esc_html__( 'Authentication required.', 'softtent-todox' ),
+				[ 'status' => 401 ]
+			);
+		}
+
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+
+		if ( $workspace_id <= 0 ) {
+			return new WP_Error(
+				'rest_forbidden',
+				esc_html__( 'Workspace context is required.', 'softtent-todox' ),
+				[ 'status' => 403 ]
+			);
+		}
+
+		if ( ! Workspace::is_member( $workspace_id, get_current_user_id() ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				esc_html__( 'You are not a member of this workspace.', 'softtent-todox' ),
+				[ 'status' => 403 ]
+			);
+		}
+
+		return true;
+	}
+
+	/**
 	 * Shorthand to build a success response.
 	 *
 	 * @since 0.1.0

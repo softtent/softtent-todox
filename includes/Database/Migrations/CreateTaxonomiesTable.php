@@ -16,13 +16,14 @@ class CreateTaxonomiesTable {
 
 		$charset = $wpdb->get_charset_collate();
 
-		// type: task_status | sprint_status | project_status | task_priority | label
+		// type: task_status | sprint_status | project_status | subtask_status | task_label | subtask_label | project_label
+		// workspace_id: NULL = global (visible in all workspaces); set = belongs to that workspace only
 		$sql = "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}st_todox_taxonomies` (
 			`id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			`workspace_id` BIGINT UNSIGNED NOT NULL,
+			`workspace_id` BIGINT UNSIGNED     DEFAULT NULL,
 			`name`         VARCHAR(100)    NOT NULL,
+			`slug`         VARCHAR(50)     DEFAULT NULL,
 			`type`         VARCHAR(50)     NOT NULL,
-			`category`     VARCHAR(50)     DEFAULT NULL,
 			`color`        VARCHAR(20)     NOT NULL DEFAULT '#6366f1',
 			`icon`         VARCHAR(100)    DEFAULT NULL,
 			`position`     INT             NOT NULL DEFAULT 0,
@@ -30,7 +31,6 @@ class CreateTaxonomiesTable {
 			`created_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			`updated_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (`id`),
-			UNIQUE KEY   `workspace_type_name` (`workspace_id`, `type`(30), `name`(50)),
 			KEY          `workspace_type` (`workspace_id`, `type`(30), `position`)
 		) {$charset};";
 

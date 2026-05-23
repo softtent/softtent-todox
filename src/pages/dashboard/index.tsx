@@ -182,7 +182,7 @@ const Welcome = ( { onCreate }: { onCreate: () => void } ) => (
 const Dashboard = () => {
 	const navigate = useNavigate();
 	const qc       = useQueryClient();
-	const { activeWorkspace, activeWorkspaceId, switchWorkspace } = useWorkspace();
+	const { activeWorkspace, activeWorkspaceId, switchWorkspace, isLoading: workspaceLoading } = useWorkspace();
 
 	const [ createOpen, setCreateOpen ]         = useState( false );
 	const [ createTaskOpen, setCreateTaskOpen ] = useState( false );
@@ -223,6 +223,14 @@ const Dashboard = () => {
 		if ( ! form.name.trim() ) return;
 		createMutation.mutate( form );
 	};
+
+	if ( workspaceLoading ) {
+		return (
+			<div className="st-todox-page-loader">
+				<Spinner />
+			</div>
+		);
+	}
 
 	if ( ! activeWorkspace ) {
 		return (
@@ -334,7 +342,7 @@ const Dashboard = () => {
 
 			{/* Stats Cards */}
 			{ statsLoading ? (
-				<div style={ { marginBottom: 32 } }><Spinner /></div>
+				<div style={ { marginBottom: 32, display: 'flex', justifyContent: 'center' } }><Spinner /></div>
 			) : stats ? (
 				<StatsCards stats={ stats } />
 			) : null }
@@ -358,7 +366,7 @@ const Dashboard = () => {
 					</div>
 
 					{ tasksLoading ? (
-						<div className="st-todox-surface-card__body"><Spinner /></div>
+						<div className="st-todox-surface-card__body" style={ { display: 'flex', justifyContent: 'center' } }><Spinner /></div>
 					) : recentTasks.length === 0 ? (
 						<div className="st-todox-empty-inline">
 							<p>No tasks yet.</p>

@@ -21,15 +21,16 @@ class CreateSprintsTable {
 			`project_id`  BIGINT UNSIGNED NOT NULL,
 			`name`        VARCHAR(200)    NOT NULL,
 			`goal`        TEXT            DEFAULT NULL,
-			`status`      ENUM('planned','active','completed') NOT NULL DEFAULT 'planned',
-			`taxonomy_id` BIGINT UNSIGNED DEFAULT NULL,
+			`status_id`   BIGINT UNSIGNED DEFAULT NULL,
 			`start_date`  DATE            DEFAULT NULL,
 			`end_date`    DATE            DEFAULT NULL,
+			`position`    INT             NOT NULL DEFAULT 0,
 			`created_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			`updated_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (`id`),
 			KEY          `project_id` (`project_id`),
-			KEY          `status` (`status`)
+			KEY          `status_id` (`status_id`),
+			KEY          `position` (`position`)
 		) {$charset};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';

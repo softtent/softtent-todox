@@ -20,6 +20,16 @@ class ProjectController extends RestApi {
 	protected $base = 'projects';
 
 	public function routes(): void {
+		$by_reorder = function ( \WP_REST_Request $req ) {
+			$items = $req->get_param( 'items' );
+			if ( ! is_array( $items ) || empty( $items ) ) {
+				return new \WP_Error( 'rest_invalid_items', esc_html__( 'Items array is required.', 'softtent-todox' ), [ 'status' => 400 ] );
+			}
+			$first_id = (int) ( $items[0]['id'] ?? 0 );
+			$ws_id    = Project::get_workspace_id( $first_id );
+			return $ws_id ? $this->can_access_workspace( $ws_id ) : false;
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base, [
 				[
@@ -31,6 +41,16 @@ class ProjectController extends RestApi {
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
 					'permission_callback' => [ $this, 'is_workspace_member' ],
+				],
+			]
+        );
+
+		register_rest_route(
+            $this->namespace, '/' . $this->base . '/reorder', [
+				[
+					'methods'             => 'POST',
+					'callback'            => [ $this, 'reorder' ],
+					'permission_callback' => $by_reorder,
 				],
 			]
         );
@@ -83,9 +103,9 @@ class ProjectController extends RestApi {
 	}
 
 	public function store( \WP_REST_Request $req ): \WP_REST_Response {
-		$name = $this->sanitize_text( $req->get_param( 'name' ) ?? '' );
+		$name         = $this->sanitize_text( $req->get_param( 'name' ) ?? '' );
 		$workspace_id = (int) $req->get_param( 'workspace_id' );
-		$team_id = (int) $req->get_param( 'team_id' );
+		$team_ids     = $this->sanitize_int_array( $req->get_param( 'team_ids' ) );
 
 		if ( empty( $name ) ) {
 			return $this->error( esc_html__( 'Project name is required.', 'softtent-todox' ) );
@@ -95,21 +115,21 @@ class ProjectController extends RestApi {
 			return $this->error( esc_html__( 'Workspace ID is required.', 'softtent-todox' ) );
 		}
 
-		if ( empty( $team_id ) ) {
-			return $this->error( esc_html__( 'Team ID is required.', 'softtent-todox' ) );
+		if ( empty( $team_ids ) ) {
+			return $this->error( esc_html__( 'At least one team is required.', 'softtent-todox' ) );
 		}
 
 		$id = Project::create(
             [
 				'name'         => $name,
 				'workspace_id' => $workspace_id,
-				'team_id'      => $team_id,
+				'team_ids'     => $team_ids,
 				'owner_id'     => $this->current_user_id(),
 				'description'  => $this->sanitize_textarea( $req->get_param( 'description' ) ?? '' ),
 				'color'        => $this->sanitize_color( $req->get_param( 'color' ) ),
 				'icon'         => $this->sanitize_text( $req->get_param( 'icon' ) ?? '' ),
-				'taxonomy_id'  => $this->sanitize_int( $req->get_param( 'taxonomy_id' ) ),
-				'status'       => $this->sanitize_enum( $req->get_param( 'status' ), [ 'active', 'completed', 'archived' ], 'active' ),
+				'status'       => $req->get_param( 'status' ) ?? 'active',
+				'status_id'    => $this->sanitize_int( $req->get_param( 'status_id' ) ),
 			]
         );
 
@@ -119,9 +139,14 @@ class ProjectController extends RestApi {
 	}
 
 	public function update( \WP_REST_Request $req ): \WP_REST_Response {
-		$id = (int) $req->get_param( 'id' );
+		$id     = (int) $req->get_param( 'id' );
+		$params = $req->get_params();
 
-		Project::update( $id, $req->get_params() );
+		if ( isset( $params['team_ids'] ) ) {
+			$params['team_ids'] = $this->sanitize_int_array( $params['team_ids'] );
+		}
+
+		Project::update( $id, $params );
 
 		return $this->ok( Project::get( $id ), esc_html__( 'Project updated.', 'softtent-todox' ) );
 	}
@@ -130,5 +155,27 @@ class ProjectController extends RestApi {
 		Project::delete( (int) $req->get_param( 'id' ) );
 
 		return $this->ok( null, esc_html__( 'Project deleted.', 'softtent-todox' ) );
+	}
+
+	public function reorder( \WP_REST_Request $req ): \WP_REST_Response {
+		$items = $req->get_param( 'items' );
+
+		if ( ! is_array( $items ) || empty( $items ) ) {
+			return $this->error( esc_html__( 'Items array is required.', 'softtent-todox' ) );
+		}
+
+		Project::reorder( $items );
+
+		return $this->ok( null, esc_html__( 'Projects reordered.', 'softtent-todox' ) );
+	}
+
+	/**
+	 * Sanitize an array of IDs from request input.
+	 */
+	private function sanitize_int_array( mixed $value ): array {
+		if ( ! is_array( $value ) ) {
+			return [];
+		}
+		return array_values( array_filter( array_map( 'intval', $value ) ) );
 	}
 }

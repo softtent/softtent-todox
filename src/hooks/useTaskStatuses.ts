@@ -12,6 +12,7 @@ import { useWorkspace } from './useWorkspace';
 import type { Taxonomy } from '../types';
 
 export interface TaskStatusOption {
+	id:    number | null;
 	value: string;
 	label: string;
 	color: string;
@@ -19,16 +20,16 @@ export interface TaskStatusOption {
 }
 
 const FALLBACK: TaskStatusOption[] = [
-	{ value: 'todo',        label: 'To Do',       color: '#94a3b8', icon: 'circle' },
-	{ value: 'in_progress', label: 'In Progress',  color: '#3b82f6', icon: 'clock' },
-	{ value: 'review',      label: 'In Review',    color: '#f59e0b', icon: 'eye' },
-	{ value: 'completed',   label: 'Completed',    color: '#22c55e', icon: 'check-circle' },
+	{ id: null, value: 'todo',        label: 'To Do',       color: '#94a3b8', icon: 'circle' },
+	{ id: null, value: 'in_progress', label: 'In Progress',  color: '#3b82f6', icon: 'clock' },
+	{ id: null, value: 'review',      label: 'In Review',    color: '#f59e0b', icon: 'eye' },
+	{ id: null, value: 'completed',   label: 'Completed',    color: '#22c55e', icon: 'check-circle' },
 ];
 
 function taxonomyToOption( t: Taxonomy ): TaskStatusOption {
-	const value = t.category
+	const value = t.slug
 		?? t.name.toLowerCase().replace( /[^a-z0-9]+/g, '_' ).replace( /^_|_$/g, '' );
-	return { value, label: t.name, color: t.color, icon: t.icon };
+	return { id: t.id, value, label: t.name, color: t.color, icon: t.icon };
 }
 
 export function useTaskStatuses() {

@@ -20,6 +20,9 @@ import {
 	DollarSign,
 	Calendar,
 	BarChart3,
+	LayoutList,
+	AlignJustify,
+	CalendarDays,
 } from 'lucide-react';
 
 /**
@@ -69,8 +72,10 @@ const NAV_GROUPS: NavGroup[] = [
 				label:    'Tasks',
 				icon:     CheckSquare,
 				children: [
-					{ path: '/tasks',        label: 'All Tasks',    icon: CheckSquare },
-					{ path: '/tasks/kanban', label: 'Kanban Board', icon: Kanban },
+					{ path: '/tasks',          label: 'Table',    icon: LayoutList   },
+					{ path: '/tasks/kanban',   label: 'Kanban',   icon: Kanban       },
+					{ path: '/tasks/list',     label: 'List',     icon: AlignJustify },
+					{ path: '/tasks/calendar', label: 'Calendar', icon: CalendarDays },
 				],
 			},
 		],
@@ -112,9 +117,14 @@ const Sidebar = () => {
 		}
 	}, [ location.pathname ] );
 
+	const TASK_VIEW_PATHS = [ '/tasks/kanban', '/tasks/list', '/tasks/calendar' ];
+
 	const isActive = ( path: string ) => {
 		if ( path === '/' ) return location.pathname === '/';
-		if ( path === '/tasks' ) return location.pathname === '/tasks' || ( location.pathname.startsWith( '/tasks' ) && location.pathname !== '/tasks/kanban' );
+		if ( path === '/tasks' ) {
+			if ( TASK_VIEW_PATHS.includes( location.pathname ) ) return false;
+			return location.pathname === '/tasks' || location.pathname.startsWith( '/tasks/' );
+		}
 		return location.pathname === path || location.pathname.startsWith( path + '/' );
 	};
 
@@ -140,12 +150,10 @@ const Sidebar = () => {
 
 			{/* Brand */}
 			<div className="st-todox-sidebar__brand">
-				{ ! collapsed && (
-					<div className="st-todox-sidebar__logo-wrap">
-						<div className="st-todox-sidebar__logo-icon">TX</div>
-						<span className="st-todox-sidebar__logo-text">TodoX</span>
-					</div>
-				) }
+				<div className="st-todox-sidebar__logo-wrap">
+					<div className="st-todox-sidebar__logo-icon">TX</div>
+					{ ! collapsed && <span className="st-todox-sidebar__logo-text">TodoX</span> }
+				</div>
 			</div>
 
 			{/* Workspace Switcher */}
@@ -173,7 +181,7 @@ const Sidebar = () => {
 										<button
 											className={ `st-todox-sidebar__nav-item ${ active ? 'st-todox-sidebar__nav-item--active' : '' }` }
 											onClick={ () => { navigate( item.path ); if ( ! collapsed ) setExpanded( ( prev ) => ( { ...prev, [ item.path ]: true } ) ); } }
-											title={ collapsed ? item.label : undefined }
+											data-label={ collapsed ? item.label : undefined }
 										>
 											<span className="st-todox-sidebar__nav-icon">
 												<Icon size={ 16 } />
@@ -195,7 +203,7 @@ const Sidebar = () => {
 											className={ ( { isActive: a } ) =>
 												`st-todox-sidebar__nav-item ${ ( a && ! item.soon ) ? 'st-todox-sidebar__nav-item--active' : '' } ${ item.soon ? 'st-todox-sidebar__nav-item--soon' : '' }`
 											}
-											title={ collapsed ? item.label : undefined }
+											data-label={ collapsed ? item.label : undefined }
 											onClick={ item.soon ? ( e ) => e.preventDefault() : undefined }
 										>
 											<span className="st-todox-sidebar__nav-icon">

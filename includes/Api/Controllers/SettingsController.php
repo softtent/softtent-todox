@@ -47,6 +47,8 @@ class SettingsController extends RestApi {
 		$params   = $req->get_params();
 		$settings = array_merge( $this->defaults(), get_option( Keys::SETTINGS, [] ) );
 
+		$bool_keys = [ 'email_notifications', 'keep_data_on_uninstall' ];
+
 		$allowed = apply_filters(
             'st_todox_allowed_settings_keys', [
 				'date_format',
@@ -58,7 +60,12 @@ class SettingsController extends RestApi {
         );
 
 		foreach ( $allowed as $key ) {
-			if ( array_key_exists( $key, $params ) ) {
+			if ( ! array_key_exists( $key, $params ) ) {
+				continue;
+			}
+			if ( in_array( $key, $bool_keys, true ) ) {
+				$settings[ $key ] = (bool) filter_var( $params[ $key ], FILTER_VALIDATE_BOOLEAN );
+			} else {
 				$settings[ $key ] = sanitize_text_field( $params[ $key ] );
 			}
 		}

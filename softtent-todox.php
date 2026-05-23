@@ -112,7 +112,7 @@ final class ST_TodoX {
 		defined( 'ST_TODOX_URL' ) || define( 'ST_TODOX_URL', plugins_url( '', ST_TODOX_FILE ) );
 		defined( 'ST_TODOX_ASSETS' ) || define( 'ST_TODOX_ASSETS', ST_TODOX_URL . '/build' );
 		defined( 'ST_TODOX_TEMPLATE_PATH' ) || define( 'ST_TODOX_TEMPLATE_PATH', ST_TODOX_PATH . 'templates' );
-		defined( 'ST_TODOX_DB_VERSION' ) || define( 'ST_TODOX_DB_VERSION', '1.3.0' );
+		defined( 'ST_TODOX_DB_VERSION' ) || define( 'ST_TODOX_DB_VERSION', '0.1.0' );
 	}
 
 	/**
@@ -135,8 +135,11 @@ final class ST_TodoX {
 	 * @since 0.1.0
 	 */
 	private function includes(): void {
+		// Installer must run for every request type so REST API calls also
+		// trigger pending DB migrations before any route handler executes.
+		$this->container['installer'] = new SoftTent\TodoX\Setup\Installer();
+
 		if ( $this->is_request( 'admin' ) ) {
-			$this->container['installer'] = new SoftTent\TodoX\Setup\Installer();
 			$this->container['admin_menu'] = new SoftTent\TodoX\Admin\Menu();
 		}
 

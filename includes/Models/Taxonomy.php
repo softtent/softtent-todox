@@ -30,12 +30,14 @@ class Taxonomy {
 			return $cached;
 		}
 
+		$table = $wpdb->prefix . self::$table;
+
 		if ( $type ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					'SELECT * FROM %i WHERE workspace_id = %d AND type = %s ORDER BY type ASC, position ASC',
-					$wpdb->prefix . self::$table,
+					'SELECT * FROM %i WHERE (workspace_id = %d OR workspace_id IS NULL) AND type = %s ORDER BY workspace_id DESC, position ASC',
+					$table,
 					$workspace_id,
 					$type
 				),
@@ -45,8 +47,8 @@ class Taxonomy {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			$rows = $wpdb->get_results(
 				$wpdb->prepare(
-					'SELECT * FROM %i WHERE workspace_id = %d ORDER BY type ASC, position ASC',
-					$wpdb->prefix . self::$table,
+					'SELECT * FROM %i WHERE workspace_id = %d OR workspace_id IS NULL ORDER BY type ASC, workspace_id DESC, position ASC',
+					$table,
 					$workspace_id
 				),
 				ARRAY_A
@@ -88,30 +90,44 @@ class Taxonomy {
 	public static function create( array $data ): int|false {
 		global $wpdb;
 
+		$is_global    = ! empty( $data['is_global'] );
+		$workspace_id = $is_global ? null : (int) $data['workspace_id'];
+
 		// No caching for position query - must get current value for accurate ordering.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$position = 1 + (int) $wpdb->get_var(
-			$wpdb->prepare(
-				'SELECT MAX(position) FROM %i WHERE workspace_id = %d AND type = %s',
-				$wpdb->prefix . self::$table,
-				(int) $data['workspace_id'],
-				sanitize_text_field( $data['type'] )
-			)
-		);
+		if ( ! $is_global ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$position = 1 + (int) $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT MAX(position) FROM %i WHERE workspace_id = %d AND type = %s',
+					$wpdb->prefix . self::$table,
+					$workspace_id,
+					sanitize_text_field( $data['type'] )
+				)
+			);
+		} else {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$position = 1 + (int) $wpdb->get_var(
+				$wpdb->prepare(
+					'SELECT MAX(position) FROM %i WHERE workspace_id IS NULL AND type = %s',
+					$wpdb->prefix . self::$table,
+					sanitize_text_field( $data['type'] )
+				)
+			);
+		}
 
 		$name     = sanitize_text_field( $data['name'] );
-		$category = isset( $data['category'] ) && $data['category'] !== ''
-			? sanitize_text_field( $data['category'] )
+		$slug = isset( $data['slug'] ) && $data['slug'] !== ''
+			? sanitize_text_field( $data['slug'] )
 			: self::slugify( $name );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$inserted = $wpdb->insert(
 			$wpdb->prefix . self::$table,
 			[
-				'workspace_id' => (int) $data['workspace_id'],
+				'workspace_id' => $workspace_id,
 				'name'         => $name,
 				'type'         => sanitize_text_field( $data['type'] ),
-				'category'     => $category,
+				'slug'         => $slug,
 				'color'        => Fns::sanitize_color( $data['color'] ?? '#6366f1' ),
 				'icon'         => isset( $data['icon'] ) ? sanitize_text_field( $data['icon'] ) : null,
 				'position'     => $position,
@@ -143,6 +159,9 @@ class Taxonomy {
 		}
 		if ( isset( $data['is_active'] ) ) {
 			$update['is_active'] = (int) $data['is_active'];
+		}
+		if ( array_key_exists( 'is_global', $data ) ) {
+			$update['workspace_id'] = $data['is_global'] ? null : (int) $data['workspace_id'];
 		}
 
 		if ( empty( $update ) ) {
@@ -192,10 +211,11 @@ class Taxonomy {
 	public static function format( array $row ): array {
 		return [
 			'id'           => (int) $row['id'],
-			'workspace_id' => (int) $row['workspace_id'],
+			'workspace_id' => isset( $row['workspace_id'] ) && $row['workspace_id'] !== null ? (int) $row['workspace_id'] : null,
+			'is_global'    => ! isset( $row['workspace_id'] ) || $row['workspace_id'] === null,
 			'name'         => $row['name'],
 			'type'         => $row['type'],
-			'category'     => $row['category'],
+			'slug'         => $row['slug'],
 			'color'        => $row['color'],
 			'icon'         => $row['icon'],
 			'position'     => (int) $row['position'],

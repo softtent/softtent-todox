@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { useState } from '@wordpress/element';
+import { useState, useRef, useEffect } from '@wordpress/element';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
@@ -20,35 +20,18 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-	Plus, Edit3, Trash2, Check, X, Tag, GripVertical,
-	CircleDashed,
+	Plus, Edit3, Trash2, Check, X, Tag, GripVertical, Globe, Lock,
 } from 'lucide-react';
 
 /**
  * Internal dependencies
  */
 import { taxonomiesApi } from '../../api';
-import Button from '../../components/ui/Button';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Spinner from '../../components/ui/Spinner';
+import { ColorPicker, IconPicker, COLORS_TAXONOMY, ICONS_STATUS } from '../../components/inputs';
 import type { Taxonomy } from '../../types';
 
-// ---- Constants ----
-
-const COLOR_OPTIONS = [
-	'#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
-	'#f43f5e', '#ef4444', '#f97316', '#f59e0b', '#eab308',
-	'#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4',
-	'#0ea5e9', '#3b82f6', '#64748b',
-];
-
-const ICON_OPTIONS: { name: string; symbol: string }[] = [
-	{ name: 'circle',  symbol: '○' },
-	{ name: 'half',    symbol: '◐' },
-	{ name: 'dot',     symbol: '◉' },
-	{ name: 'check',   symbol: '✓' },
-	{ name: 'pause',   symbol: '⏸' },
-];
 
 type StatusType = 'task_status' | 'subtask_status' | 'sprint_status' | 'project_status';
 
@@ -62,15 +45,17 @@ const TAB_CONFIG: { id: StatusType; label: string }[] = [
 // ---- Helpers ----
 
 const getSymbol = ( icon: string | null ) =>
-	ICON_OPTIONS.find( ( i ) => i.name === icon )?.symbol ?? '○';
+	ICONS_STATUS.find( ( i ) => i.name === icon )?.symbol ?? '○';
 
 // ---- Sortable Status Row ----
+
+type EditForm = { name: string; color: string; icon: string; is_global: boolean };
 
 interface StatusRowProps {
 	taxonomy:    Taxonomy;
 	editingId:   number | null;
-	editForm:    { name: string; color: string; icon: string };
-	setEditForm: ( f: { name: string; color: string; icon: string } ) => void;
+	editForm:    EditForm;
+	setEditForm: ( f: EditForm ) => void;
 	onEdit:      () => void;
 	onDelete:    () => void;
 	onSave:      () => void;
@@ -120,27 +105,26 @@ const SortableStatusRow = ( {
 						onKeyDown={ ( e ) => { if ( e.key === 'Enter' ) onSave(); if ( e.key === 'Escape' ) onCancel(); } }
 					/>
 					<div className="st-todox-status-row__color-row">
-						{ COLOR_OPTIONS.map( ( c ) => (
-							<button
-								key={ c }
-								type="button"
-								className={ `st-todox-color-swatch ${ editForm.color === c ? 'st-todox-color-swatch--selected' : '' }` }
-								style={ { background: c } }
-								onClick={ () => setEditForm( { ...editForm, color: c } ) }
-							/>
-						) ) }
+						<ColorPicker colors={ COLORS_TAXONOMY } value={ editForm.color } onChange={ ( c ) => setEditForm( { ...editForm, color: c } ) } />
 					</div>
 					<div className="st-todox-status-row__icon-row">
-						{ ICON_OPTIONS.map( ( icon ) => (
-							<button
-								key={ icon.name }
-								type="button"
-								className={ `st-todox-icon-btn ${ editForm.icon === icon.name ? 'st-todox-icon-btn--selected' : '' }` }
-								onClick={ () => setEditForm( { ...editForm, icon: icon.name } ) }
-							>
-								{ icon.symbol }
-							</button>
-						) ) }
+						<IconPicker icons={ ICONS_STATUS } value={ editForm.icon } onChange={ ( name ) => setEditForm( { ...editForm, icon: name } ) } />
+					</div>
+					<div className="st-todox-status-row__scope-row">
+						<button
+							type="button"
+							className={ `st-todox-scope-btn ${ ! editForm.is_global ? 'st-todox-scope-btn--active' : '' }` }
+							onClick={ () => setEditForm( { ...editForm, is_global: false } ) }
+						>
+							<Lock size={ 12 } /> This workspace
+						</button>
+						<button
+							type="button"
+							className={ `st-todox-scope-btn ${ editForm.is_global ? 'st-todox-scope-btn--active' : '' }` }
+							onClick={ () => setEditForm( { ...editForm, is_global: true } ) }
+						>
+							<Globe size={ 12 } /> All workspaces
+						</button>
 					</div>
 					<div className="st-todox-status-row__edit-actions">
 						<button
@@ -177,6 +161,15 @@ const SortableStatusRow = ( {
 						<span style={ { color: taxonomy.color } }>{ getSymbol( taxonomy.icon ) }</span>
 						{ taxonomy.name }
 					</span>
+					<span
+						className={ `st-todox-scope-badge ${ taxonomy.is_global ? 'st-todox-scope-badge--global' : 'st-todox-scope-badge--workspace' }` }
+						title={ taxonomy.is_global ? 'Visible in all workspaces' : 'This workspace only' }
+					>
+						{ taxonomy.is_global
+							? <><Globe size={ 11 } /> All workspaces</>
+							: <><Lock size={ 11 } /> This workspace</>
+						}
+					</span>
 					<div className="st-todox-status-row__hover-actions">
 						<button className="st-todox-status-row__edit-btn" onClick={ onEdit } title="Edit">
 							<Edit3 size={ 13 } />
@@ -191,39 +184,50 @@ const SortableStatusRow = ( {
 	);
 };
 
-// ---- Add Status Modal ----
+// ---- Inline Add Form ----
 
-interface AddModalProps {
-	open:        boolean;
-	defaultType: StatusType;
+interface InlineAddStatusProps {
+	activeType:  StatusType;
 	workspaceId: number;
-	onClose:     () => void;
 	onCreated:   ( taxonomy: Taxonomy ) => void;
 }
 
-const AddModal = ( { open, defaultType, workspaceId, onClose, onCreated }: AddModalProps ) => {
-	const [ form, setForm ] = useState( {
+const InlineAddStatus = ( { activeType, workspaceId, onCreated }: InlineAddStatusProps ) => {
+	const [ isAdding, setIsAdding ] = useState( false );
+	const [ form, setForm ]         = useState( {
 		name:  '',
-		color: COLOR_OPTIONS[ 0 ],
-		icon:  ICON_OPTIONS[ 0 ].name,
-		type:  defaultType,
+		color: COLORS_TAXONOMY[ 0 ],
+		icon:  ICONS_STATUS[ 0 ].name,
 	} );
-	const [ saving, setSaving ] = useState( false );
+	const [ saving, setSaving ]     = useState( false );
+	const inputRef                  = useRef<HTMLInputElement>( null );
 
-	const handleCreate = async () => {
-		if ( ! form.name.trim() ) return;
+	useEffect( () => {
+		if ( isAdding ) inputRef.current?.focus();
+	}, [ isAdding ] );
+
+	// Reset when the active type tab changes
+	useEffect( () => {
+		setIsAdding( false );
+		setForm( { name: '', color: COLORS_TAXONOMY[ 0 ], icon: ICONS_STATUS[ 0 ].name } );
+	}, [ activeType ] );
+
+	const handleSave = async () => {
+		if ( ! form.name.trim() || saving ) return;
 		setSaving( true );
 		try {
 			const created = await taxonomiesApi.create( {
 				workspace_id: workspaceId,
-				name:  form.name.trim(),
-				type:  form.type,
-				color: form.color,
-				icon:  form.icon,
+				name:         form.name.trim(),
+				type:         activeType,
+				color:        form.color,
+				icon:         form.icon,
+				is_global:    false,
 			} );
 			onCreated( created );
-			setForm( { name: '', color: COLOR_OPTIONS[ 0 ], icon: ICON_OPTIONS[ 0 ].name, type: form.type } );
+			setForm( { name: '', color: COLORS_TAXONOMY[ 0 ], icon: ICONS_STATUS[ 0 ].name } );
 			toast.success( 'Status created.' );
+			setTimeout( () => inputRef.current?.focus(), 0 );
 		} catch {
 			toast.error( 'Failed to create status.' );
 		} finally {
@@ -231,105 +235,57 @@ const AddModal = ( { open, defaultType, workspaceId, onClose, onCreated }: AddMo
 		}
 	};
 
-	if ( ! open ) return null;
+	const handleCancel = () => {
+		setForm( { name: '', color: COLORS_TAXONOMY[ 0 ], icon: ICONS_STATUS[ 0 ].name } );
+		setIsAdding( false );
+	};
+
+	if ( ! isAdding ) {
+		return (
+			<button
+				className="st-todox-add-task-row"
+				onClick={ () => setIsAdding( true ) }
+			>
+				<Plus size={ 13 } /> Add status
+			</button>
+		);
+	}
 
 	return (
-		<div className="st-todox-td-edit-overlay">
-			<div className="st-todox-status-modal">
-				<div className="st-todox-status-modal__head">
-					<h2>Add Status</h2>
-					<button className="st-todox-td-edit-modal__close" onClick={ onClose }><X size={ 15 } /></button>
-				</div>
-				<div className="st-todox-status-modal__body">
-					{/* Type tabs */}
-					<div className="st-todox-status-modal__type-tabs">
-						{ TAB_CONFIG.map( ( t ) => (
-							<button
-								key={ t.id }
-								type="button"
-								className={ `st-todox-status-modal__type-btn ${ form.type === t.id ? 'st-todox-status-modal__type-btn--active' : '' }` }
-								onClick={ () => setForm( { ...form, type: t.id } ) }
-							>
-								{ t.label }
-							</button>
-						) ) }
-					</div>
-
-					{/* Name */}
-					<div className="st-todox-settings-field">
-						<label className="st-todox-settings-field__label">Name <span className="st-todox-req">*</span></label>
-						<input
-							type="text"
-							className="st-todox-form__input"
-							placeholder="e.g., In Review, Blocked, QA"
-							value={ form.name }
-							onChange={ ( e ) => setForm( { ...form, name: e.target.value } ) }
-							onKeyDown={ ( e ) => { if ( e.key === 'Enter' ) handleCreate(); } }
-							autoFocus
-						/>
-					</div>
-
-					{/* Color */}
-					<div className="st-todox-settings-field">
-						<label className="st-todox-settings-field__label">Color</label>
-						<div className="st-todox-color-grid">
-							{ COLOR_OPTIONS.map( ( c ) => (
-								<button
-									key={ c }
-									type="button"
-									className={ `st-todox-color-swatch st-todox-color-swatch--lg ${ form.color === c ? 'st-todox-color-swatch--selected' : '' }` }
-									style={ { background: c } }
-									onClick={ () => setForm( { ...form, color: c } ) }
-								/>
-							) ) }
-						</div>
-					</div>
-
-					{/* Icon */}
-					<div className="st-todox-settings-field">
-						<label className="st-todox-settings-field__label">Icon</label>
-						<div className="st-todox-icon-row">
-							{ ICON_OPTIONS.map( ( icon ) => (
-								<button
-									key={ icon.name }
-									type="button"
-									className={ `st-todox-icon-btn st-todox-icon-btn--lg ${ form.icon === icon.name ? 'st-todox-icon-btn--selected' : '' }` }
-									onClick={ () => setForm( { ...form, icon: icon.name } ) }
-								>
-									{ icon.symbol }
-								</button>
-							) ) }
-						</div>
-					</div>
-
-					{/* Preview */}
-					{ form.name.trim() && (
-						<div className="st-todox-status-modal__preview">
-							<span className="st-todox-settings-field__label">Preview</span>
-							<span
-								className="st-todox-status-badge"
-								style={ {
-									background: form.color + '18',
-									color:      form.color,
-									border:     `1px solid ${ form.color }30`,
-								} }
-							>
-								<span>{ getSymbol( form.icon ) }</span>
-								{ form.name }
-							</span>
-						</div>
-					) }
-				</div>
-				<div className="st-todox-status-modal__footer">
-					<Button variant="secondary" onClick={ onClose }>Cancel</Button>
-					<Button
-						onClick={ handleCreate }
-						loading={ saving }
-						disabled={ ! form.name.trim() }
-					>
-						Create Status
-					</Button>
-				</div>
+		<div className="st-todox-status-row__edit st-todox-status-row__edit--inline-add">
+			<input
+				ref={ inputRef }
+				type="text"
+				className="st-todox-form__input st-todox-status-row__name-input"
+				placeholder="Status name…"
+				value={ form.name }
+				onChange={ ( e ) => setForm( { ...form, name: e.target.value } ) }
+				onKeyDown={ ( e ) => { if ( e.key === 'Enter' ) handleSave(); if ( e.key === 'Escape' ) handleCancel(); } }
+				disabled={ saving }
+			/>
+			<div className="st-todox-status-row__color-row">
+				<ColorPicker colors={ COLORS_TAXONOMY } value={ form.color } onChange={ ( c ) => setForm( { ...form, color: c } ) } />
+			</div>
+			<div className="st-todox-status-row__icon-row">
+				<IconPicker icons={ ICONS_STATUS } value={ form.icon } onChange={ ( name ) => setForm( { ...form, icon: name } ) } />
+			</div>
+			<div className="st-todox-status-row__edit-actions">
+				<button
+					className="st-todox-status-row__save-btn"
+					onClick={ handleSave }
+					disabled={ saving || ! form.name.trim() }
+					title="Save (Enter)"
+				>
+					<Check size={ 13 } />
+				</button>
+				<button
+					className="st-todox-status-row__cancel-btn"
+					onClick={ handleCancel }
+					disabled={ saving }
+					title="Cancel (Esc)"
+				>
+					<X size={ 13 } />
+				</button>
 			</div>
 		</div>
 	);
@@ -345,8 +301,7 @@ const StatusesSection = ( { workspaceId }: StatusesSectionProps ) => {
 	const qc = useQueryClient();
 	const [ activeTab, setActiveTab ] = useState<StatusType>( 'task_status' );
 	const [ editingId, setEditingId ] = useState<number | null>( null );
-	const [ editForm, setEditForm ]   = useState( { name: '', color: COLOR_OPTIONS[ 0 ], icon: ICON_OPTIONS[ 0 ].name } );
-	const [ addOpen, setAddOpen ]     = useState( false );
+	const [ editForm, setEditForm ]   = useState<EditForm>( { name: '', color: COLORS_TAXONOMY[ 0 ], icon: ICONS_STATUS[ 0 ].name, is_global: false } );
 	const [ deleteId, setDeleteId ]   = useState<number | null>( null );
 
 	const sensors = useSensors(
@@ -375,8 +330,8 @@ const StatusesSection = ( { workspaceId }: StatusesSectionProps ) => {
 	};
 
 	const updateMutation = useMutation( {
-		mutationFn: ( { id, data }: { id: number; data: { name: string; color: string; icon: string } } ) =>
-			taxonomiesApi.update( id, data ),
+		mutationFn: ( { id, data }: { id: number; data: EditForm } ) =>
+			taxonomiesApi.update( id, { ...data, workspace_id: workspaceId } ),
 		onSuccess: ( updated ) => {
 			for ( const type of Object.keys( queryMap ) as StatusType[] ) {
 				qc.setQueryData< Taxonomy[] >( queryKey( type ), ( prev ) =>
@@ -415,9 +370,10 @@ const StatusesSection = ( { workspaceId }: StatusesSectionProps ) => {
 	const startEdit = ( taxonomy: Taxonomy ) => {
 		setEditingId( taxonomy.id );
 		setEditForm( {
-			name:  taxonomy.name,
-			color: taxonomy.color,
-			icon:  taxonomy.icon ?? ICON_OPTIONS[ 0 ].name,
+			name:      taxonomy.name,
+			color:     taxonomy.color,
+			icon:      taxonomy.icon ?? ICONS_STATUS[ 0 ].name,
+			is_global: taxonomy.is_global,
 		} );
 	};
 
@@ -432,7 +388,6 @@ const StatusesSection = ( { workspaceId }: StatusesSectionProps ) => {
 		qc.setQueryData< Taxonomy[] >( queryKey( taxonomy.type as StatusType ), ( prev ) =>
 			[ ...( prev ?? [] ), taxonomy ]
 		);
-		setAddOpen( false );
 	};
 
 	const handleDragEnd = ( event: DragEndEvent ) => {
@@ -467,9 +422,6 @@ const StatusesSection = ( { workspaceId }: StatusesSectionProps ) => {
 						Customize the statuses available for tasks, subtasks, sprints, and projects.
 					</p>
 				</div>
-				<Button size="sm" onClick={ () => setAddOpen( true ) }>
-					<Plus size={ 13 } /> Add Status
-				</Button>
 			</div>
 
 			{/* Tab bar */}
@@ -494,51 +446,53 @@ const StatusesSection = ( { workspaceId }: StatusesSectionProps ) => {
 			<div className="st-todox-statuses-list">
 				{ isLoading ? (
 					<div className="st-todox-statuses-list__loading"><Spinner /></div>
-				) : statuses && statuses.length > 0 ? (
-					<DndContext
-						sensors={ sensors }
-						collisionDetection={ closestCenter }
-						onDragEnd={ handleDragEnd }
-					>
-						<SortableContext
-							items={ statuses.map( ( t ) => t.id ) }
-							strategy={ verticalListSortingStrategy }
-						>
-							{ statuses.map( ( taxonomy ) => (
-								<SortableStatusRow
-									key={ taxonomy.id }
-									taxonomy={ taxonomy }
-									editingId={ editingId }
-									editForm={ editForm }
-									setEditForm={ setEditForm }
-									onEdit={ () => startEdit( taxonomy ) }
-									onDelete={ () => setDeleteId( taxonomy.id ) }
-									onSave={ saveEdit }
-									onCancel={ cancelEdit }
-									isSaving={ updateMutation.isPending }
-								/>
-							) ) }
-						</SortableContext>
-					</DndContext>
 				) : (
-					<div className="st-todox-td-empty">
-						<Tag size={ 28 } className="st-todox-td-empty__icon" />
-						<p className="st-todox-td-empty__title">No statuses yet</p>
-						<p className="st-todox-td-empty__hint">
-							Click "Add Status" to create the first { activeTab.replace( '_status', '' ) } status.
-						</p>
-					</div>
+					<>
+						{ statuses && statuses.length > 0 ? (
+							<DndContext
+								sensors={ sensors }
+								collisionDetection={ closestCenter }
+								onDragEnd={ handleDragEnd }
+							>
+								<SortableContext
+									items={ statuses.map( ( t ) => t.id ) }
+									strategy={ verticalListSortingStrategy }
+								>
+									{ statuses.map( ( taxonomy ) => (
+										<SortableStatusRow
+											key={ taxonomy.id }
+											taxonomy={ taxonomy }
+											editingId={ editingId }
+											editForm={ editForm }
+											setEditForm={ setEditForm }
+											onEdit={ () => startEdit( taxonomy ) }
+											onDelete={ () => setDeleteId( taxonomy.id ) }
+											onSave={ saveEdit }
+											onCancel={ cancelEdit }
+											isSaving={ updateMutation.isPending }
+										/>
+									) ) }
+								</SortableContext>
+							</DndContext>
+						) : (
+							<div className="st-todox-td-empty">
+								<Tag size={ 28 } className="st-todox-td-empty__icon" />
+								<p className="st-todox-td-empty__title">No statuses yet</p>
+								<p className="st-todox-td-empty__hint">
+									Use the form below to create the first { activeTab.replace( '_status', '' ) } status.
+								</p>
+							</div>
+						) }
+
+						<InlineAddStatus
+							key={ activeTab }
+							activeType={ activeTab }
+							workspaceId={ workspaceId }
+							onCreated={ handleCreated }
+						/>
+					</>
 				) }
 			</div>
-
-			{/* Add modal */}
-			<AddModal
-				open={ addOpen }
-				defaultType={ activeTab }
-				workspaceId={ workspaceId }
-				onClose={ () => setAddOpen( false ) }
-				onCreated={ handleCreated }
-			/>
 
 			{/* Delete confirm */}
 			<ConfirmDialog

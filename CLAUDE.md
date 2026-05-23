@@ -105,7 +105,7 @@ Custom task statuses and sprint statuses are stored in `st_todox_taxonomies` wit
 | `ST_TODOX_PATH` | Plugin directory (with trailing slash) |
 | `ST_TODOX_URL` | Plugin URL (no trailing slash) |
 | `ST_TODOX_ASSETS` | `ST_TODOX_URL . '/build'` |
-| `ST_TODOX_DB_VERSION` | `1.3.0` |
+| `ST_TODOX_DB_VERSION` | `0.1.0` |
 
 ## WP Option Keys (via `Helpers\Keys`)
 

@@ -14,6 +14,7 @@ import {
 	AlertTriangle,
 	ChevronRight,
 	Tag,
+	Bookmark,
 } from 'lucide-react';
 
 /**
@@ -25,8 +26,9 @@ import Avatar from '../../components/ui/Avatar';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import StatusesSection from './StatusesSection';
+import LabelsSection from './LabelsSection';
 
-type Section = 'profile' | 'general' | 'notifications' | 'data' | 'statuses';
+type Section = 'profile' | 'general' | 'statuses' | 'labels' | 'notifications' | 'data';
 
 interface Settings {
 	tasks_per_page?: number;
@@ -40,6 +42,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: React.ComponentType<{ size?
 	{ id: 'profile',       label: 'Profile',          icon: User },
 	{ id: 'general',       label: 'General',           icon: Settings2 },
 	{ id: 'statuses',      label: 'Statuses',          icon: Tag },
+	{ id: 'labels',        label: 'Labels',            icon: Bookmark },
 	{ id: 'notifications', label: 'Notifications',     icon: Bell },
 	{ id: 'data',          label: 'Data & Privacy',    icon: Database },
 ];
@@ -298,6 +301,19 @@ const SettingsPage = () => {
 							<div className="st-todox-settings-info-banner st-todox-settings-info-banner--blue">
 								<Tag size={ 14 } className="st-todox-settings-info-banner__icon" />
 								<p>Please select or create a workspace first to manage statuses.</p>
+							</div>
+						</div>
+					) }
+
+					{ activeSection === 'labels' && activeWorkspaceId && (
+						<LabelsSection workspaceId={ activeWorkspaceId } />
+					) }
+
+					{ activeSection === 'labels' && ! activeWorkspaceId && (
+						<div className="st-todox-settings-stack">
+							<div className="st-todox-settings-info-banner st-todox-settings-info-banner--blue">
+								<Bookmark size={ 14 } className="st-todox-settings-info-banner__icon" />
+								<p>Please select or create a workspace first to manage labels.</p>
 							</div>
 						</div>
 					) }

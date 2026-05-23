@@ -1,31 +1,27 @@
 /**
  * External dependencies
  */
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useRef } from '@wordpress/element';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 
 /**
  * Internal dependencies
  */
-import { subtasksApi, usersApi } from '../../../api';
+import { subtasksApi, usersApi, taxonomiesApi } from '../../../api';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
-import type { Subtask, SubtaskStatus, TaskPriority, CreateSubtaskInput } from '../../../types';
+import LabelSelector from '../../ui/LabelSelector';
+import type { Subtask, TaskPriority, CreateSubtaskInput } from '../../../types';
 
 interface SubtaskModalProps {
-	isOpen:    boolean;
-	onClose:   () => void;
-	taskId:    number;
-	subtask?:  Subtask;
-	onSaved?:  () => void;
+	isOpen:      boolean;
+	onClose:     () => void;
+	taskId:      number;
+	workspaceId: number;
+	subtask?:    Subtask;
+	onSaved?:    () => void;
 }
-
-const STATUSES: { value: SubtaskStatus; label: string }[] = [
-	{ value: 'todo',        label: 'To Do' },
-	{ value: 'in_progress', label: 'In Progress' },
-	{ value: 'done',        label: 'Done' },
-];
 
 const PRIORITIES: { value: TaskPriority; label: string }[] = [
 	{ value: 'low',    label: 'Low' },
@@ -37,29 +33,41 @@ const PRIORITIES: { value: TaskPriority; label: string }[] = [
 const emptyForm = (): CreateSubtaskInput => ( {
 	title:       '',
 	description: '',
-	status:      'todo',
+	status_id:   null,
 	priority:    'medium',
+	start_date:  null,
 	due_date:    null,
 	assignee_id: null,
+	label_ids:   [],
 } );
 
-const SubtaskModal = ( { isOpen, onClose, taskId, subtask, onSaved }: SubtaskModalProps ) => {
-	const qc      = useQueryClient();
-	const isEdit  = !! subtask;
+const SubtaskModal = ( { isOpen, onClose, taskId, workspaceId, subtask, onSaved }: SubtaskModalProps ) => {
+	const qc        = useQueryClient();
+	const isEdit    = !! subtask;
+	const titleRef  = useRef<HTMLInputElement>( null );
 	const [ form, setForm ] = useState<CreateSubtaskInput>( emptyForm() );
+
+	const { data: subtaskStatuses = [] } = useQuery( {
+		queryKey:  [ 'taxonomies', 'subtask_status', workspaceId ],
+		queryFn:   () => taxonomiesApi.getAll( workspaceId, 'subtask_status' ),
+		enabled:   isOpen,
+		staleTime: 5 * 60_000,
+	} );
 
 	useEffect( () => {
 		if ( isOpen ) {
 			setForm( subtask ? {
 				title:       subtask.title,
 				description: subtask.description ?? '',
-				status:      subtask.status,
+				status_id:   subtask.status_id ?? null,
 				priority:    subtask.priority,
+				start_date:  subtask.start_date ?? null,
 				due_date:    subtask.due_date ?? null,
 				assignee_id: subtask.assignee_id ?? null,
-			} : emptyForm() );
+				label_ids:   ( subtask.labels ?? [] ).map( ( l ) => l.id ),
+			} : { ...emptyForm(), status_id: subtaskStatuses[0]?.id ?? null } );
 		}
-	}, [ isOpen, subtask ] );
+	}, [ isOpen, subtask, subtaskStatuses ] );
 
 	const { data: usersData } = useQuery( {
 		queryKey: [ 'users', 'all' ],
@@ -79,7 +87,12 @@ const SubtaskModal = ( { isOpen, onClose, taskId, subtask, onSaved }: SubtaskMod
 			qc.invalidateQueries( { queryKey: [ 'tasks', taskId ] } );
 			toast.success( isEdit ? 'Subtask updated.' : 'Subtask created.' );
 			onSaved?.();
-			handleClose();
+			if ( isEdit ) {
+				handleClose();
+			} else {
+				setForm( { ...emptyForm(), status_id: subtaskStatuses[0]?.id ?? null } );
+				setTimeout( () => titleRef.current?.focus(), 0 );
+			}
 		},
 		onError: ( err: Error ) => toast.error( err.message ),
 	} );
@@ -127,6 +140,7 @@ const SubtaskModal = ( { isOpen, onClose, taskId, subtask, onSaved }: SubtaskMod
 						Title <span className="st-todox-form__required">*</span>
 					</label>
 					<input
+						ref={ titleRef }
 						type="text"
 						className="st-todox-form__input"
 						placeholder="Subtask title…"
@@ -154,11 +168,11 @@ const SubtaskModal = ( { isOpen, onClose, taskId, subtask, onSaved }: SubtaskMod
 						<label className="st-todox-form__label">Status</label>
 						<select
 							className="st-todox-form__select"
-							value={ form.status }
-							onChange={ ( e ) => set( 'status', e.target.value as SubtaskStatus ) }
+							value={ form.status_id ?? '' }
+							onChange={ ( e ) => set( 'status_id', e.target.value ? Number( e.target.value ) : null ) }
 						>
-							{ STATUSES.map( ( s ) => (
-								<option key={ s.value } value={ s.value }>{ s.label }</option>
+							{ subtaskStatuses.map( ( s ) => (
+								<option key={ s.id } value={ s.id }>{ s.name }</option>
 							) ) }
 						</select>
 					</div>
@@ -177,20 +191,31 @@ const SubtaskModal = ( { isOpen, onClose, taskId, subtask, onSaved }: SubtaskMod
 					</div>
 				</div>
 
-				{/* Assignee + Due Date */}
+				{/* Assignee */}
+				<div className="st-todox-form__group">
+					<label className="st-todox-form__label">Assignee</label>
+					<select
+						className="st-todox-form__select"
+						value={ form.assignee_id ?? '' }
+						onChange={ ( e ) => set( 'assignee_id', e.target.value ? Number( e.target.value ) : null ) }
+					>
+						<option value="">Unassigned</option>
+						{ users.map( ( u ) => (
+							<option key={ u.id } value={ u.id }>{ u.name }</option>
+						) ) }
+					</select>
+				</div>
+
+				{/* Start Date + Due Date */}
 				<div className="st-todox-form__row">
 					<div className="st-todox-form__group">
-						<label className="st-todox-form__label">Assignee</label>
-						<select
-							className="st-todox-form__select"
-							value={ form.assignee_id ?? '' }
-							onChange={ ( e ) => set( 'assignee_id', e.target.value ? Number( e.target.value ) : null ) }
-						>
-							<option value="">Unassigned</option>
-							{ users.map( ( u ) => (
-								<option key={ u.id } value={ u.id }>{ u.name }</option>
-							) ) }
-						</select>
+						<label className="st-todox-form__label">Start Date</label>
+						<input
+							type="date"
+							className="st-todox-form__input"
+							value={ form.start_date ?? '' }
+							onChange={ ( e ) => set( 'start_date', e.target.value || null ) }
+						/>
 					</div>
 
 					<div className="st-todox-form__group">
@@ -203,6 +228,20 @@ const SubtaskModal = ( { isOpen, onClose, taskId, subtask, onSaved }: SubtaskMod
 						/>
 					</div>
 				</div>
+
+				{/* Labels */}
+				{ workspaceId && (
+					<div className="st-todox-form__group">
+						<label className="st-todox-form__label">Labels</label>
+						<LabelSelector
+							workspaceId={ workspaceId }
+							labelType="subtask_label"
+							selectedIds={ form.label_ids || [] }
+							onChange={ ( ids ) => set( 'label_ids', ids ) }
+						/>
+					</div>
+				) }
+
 			</form>
 		</Modal>
 	);

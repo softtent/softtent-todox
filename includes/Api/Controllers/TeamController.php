@@ -20,6 +20,16 @@ class TeamController extends RestApi {
 	protected $base = 'teams';
 
 	public function routes(): void {
+		$by_reorder = function ( \WP_REST_Request $req ) {
+			$items = $req->get_param( 'items' );
+			if ( ! is_array( $items ) || empty( $items ) ) {
+				return new \WP_Error( 'rest_invalid_items', esc_html__( 'Items array is required.', 'softtent-todox' ), [ 'status' => 400 ] );
+			}
+			$first_id = (int) ( $items[0]['id'] ?? 0 );
+			$ws_id    = Team::get_workspace_id( $first_id );
+			return $ws_id ? $this->can_access_workspace( $ws_id ) : false;
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base, [
 				[
@@ -31,6 +41,16 @@ class TeamController extends RestApi {
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
 					'permission_callback' => [ $this, 'is_workspace_member' ],
+				],
+			]
+        );
+
+		register_rest_route(
+            $this->namespace, '/' . $this->base . '/reorder', [
+				[
+					'methods'             => 'POST',
+					'callback'            => [ $this, 'reorder' ],
+					'permission_callback' => $by_reorder,
 				],
 			]
         );
@@ -160,5 +180,17 @@ class TeamController extends RestApi {
 		Team::remove_member( (int) $req->get_param( 'id' ), (int) $req->get_param( 'user_id' ) );
 
 		return $this->ok( null, esc_html__( 'Member removed.', 'softtent-todox' ) );
+	}
+
+	public function reorder( \WP_REST_Request $req ): \WP_REST_Response {
+		$items = $req->get_param( 'items' );
+
+		if ( ! is_array( $items ) || empty( $items ) ) {
+			return $this->error( esc_html__( 'Items array is required.', 'softtent-todox' ) );
+		}
+
+		Team::reorder( $items );
+
+		return $this->ok( null, esc_html__( 'Teams reordered.', 'softtent-todox' ) );
 	}
 }
