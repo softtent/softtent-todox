@@ -1,4 +1,4 @@
-=== Softtent TodoX ===
+=== SoftTent TodoX ===
 Contributors:      softtent
 Tags:              project management, tasks, kanban, sprints, teams
 Requires at least: 6.4
@@ -12,7 +12,7 @@ A professional project management system for WordPress. Manage workspaces, depar
 
 == Description ==
 
-Softtent TodoX is a full-featured project management plugin for WordPress. It provides a clean, fast React-powered SPA that lets your team manage work without leaving your WordPress site.
+SoftTent TodoX is a full-featured project management plugin for WordPress. It provides a clean, fast React-powered SPA that lets your team manage work without leaving your WordPress site.
 
 **Key Features**
 
