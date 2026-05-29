@@ -117,8 +117,8 @@ class Sprint {
 				'name'       => sanitize_text_field( $data['name'] ),
 				'goal'       => isset( $data['goal'] ) ? wp_kses_post( $data['goal'] ) : null,
 				'status_id'  => $status_id,
-				'start_date' => $data['start_date'] ?? null,
-				'end_date'   => $data['end_date'] ?? null,
+				'start_date' => self::valid_date( $data['start_date'] ?? null ),
+				'end_date'   => self::valid_date( $data['end_date'] ?? null ),
 			]
 		);
 
@@ -145,10 +145,10 @@ class Sprint {
 			$update['status_id'] = $data['status_id'] ? (int) $data['status_id'] : null;
 		}
 		if ( isset( $data['start_date'] ) ) {
-			$update['start_date'] = ! empty( $data['start_date'] ) ? $data['start_date'] : null;
+			$update['start_date'] = self::valid_date( $data['start_date'] );
 		}
 		if ( isset( $data['end_date'] ) ) {
-			$update['end_date'] = ! empty( $data['end_date'] ) ? $data['end_date'] : null;
+			$update['end_date'] = self::valid_date( $data['end_date'] );
 		}
 
 		if ( empty( $update ) ) {
@@ -261,6 +261,20 @@ class Sprint {
 			'created_at'  => Fns::format_datetime( $row['created_at'] ),
 			'updated_at'  => Fns::format_datetime( $row['updated_at'] ),
 		];
+	}
+
+	/**
+	 * Accept MySQL DATE/DATETIME strings. Return null for invalid/empty input.
+	 */
+	private static function valid_date( mixed $value ): ?string {
+		if ( empty( $value ) ) {
+			return null;
+		}
+		$ts = strtotime( (string) $value );
+		if ( ! $ts ) {
+			return null;
+		}
+		return gmdate( 'Y-m-d', $ts );
 	}
 
 	private static function sanitize_status( string $status ): string {

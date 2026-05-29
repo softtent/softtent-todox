@@ -164,9 +164,22 @@ class TaxonomyController extends RestApi {
 	}
 
 	public function update( \WP_REST_Request $req ): \WP_REST_Response {
-		$id = (int) $req->get_param( 'id' );
+		$id     = (int) $req->get_param( 'id' );
+		$params = $req->get_params();
 
-		Taxonomy::update( $id, $req->get_params() );
+		// Scope mutation (is_global / workspace_id) is admin-only. Allowing any
+		// workspace member to flip is_global would let them either promote a
+		// workspace-scoped taxonomy into the global pool or move it to a
+		// different workspace.
+		if ( array_key_exists( 'is_global', $params ) || array_key_exists( 'workspace_id', $params ) ) {
+			if ( current_user_can( 'manage_options' ) ) {
+				$params['allow_scope_change'] = true;
+			} else {
+				unset( $params['is_global'], $params['workspace_id'] );
+			}
+		}
+
+		Taxonomy::update( $id, $params );
 
 		return $this->ok( Taxonomy::get( $id ), esc_html__( 'Taxonomy updated.', 'softtent-todox' ) );
 	}

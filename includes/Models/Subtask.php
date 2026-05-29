@@ -97,8 +97,8 @@ class Subtask {
 				'description' => isset( $data['description'] ) ? wp_kses_post( $data['description'] ) : null,
 				'status_id'   => $status_id,
 				'priority'    => in_array( $data['priority'] ?? '', [ 'low', 'medium', 'high', 'urgent' ], true ) ? $data['priority'] : 'medium',
-				'start_date'  => $data['start_date'] ?? null,
-				'due_date'    => $data['due_date'] ?? null,
+				'start_date'  => self::valid_date( $data['start_date'] ?? null ),
+				'due_date'    => self::valid_date( $data['due_date'] ?? null ),
 				'completed'   => isset( $data['completed'] ) ? (int) $data['completed'] : 0,
 				'position'    => $position,
 				'assignee_id' => isset( $data['assignee_id'] ) ? (int) $data['assignee_id'] : null,
@@ -143,6 +143,10 @@ class Subtask {
 				case 'assignee_id':
 				case 'position':
 					$update[ $field ] = $data[ $field ] !== null ? (int) $data[ $field ] : null;
+					break;
+				case 'start_date':
+				case 'due_date':
+					$update[ $field ] = self::valid_date( $data[ $field ] );
 					break;
 				case 'label_ids':
 					$update['label_ids'] = self::encode_label_ids( $data[ $field ] );
@@ -224,6 +228,20 @@ class Subtask {
 			'created_at'  => Fns::format_datetime( $row['created_at'] ),
 			'updated_at'  => Fns::format_datetime( $row['updated_at'] ),
 		];
+	}
+
+	/**
+	 * Accept MySQL DATE/DATETIME strings. Return null for invalid/empty input.
+	 */
+	private static function valid_date( mixed $value ): ?string {
+		if ( empty( $value ) ) {
+			return null;
+		}
+		$ts = strtotime( (string) $value );
+		if ( ! $ts ) {
+			return null;
+		}
+		return gmdate( 'Y-m-d', $ts );
 	}
 
 	private static function sanitize_status( string $status ): string {

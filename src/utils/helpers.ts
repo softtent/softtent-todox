@@ -1,4 +1,4 @@
-import type { TaskPriority, TaskStatus } from '../types';
+import type { TaskPriority } from '../types';
 
 export function cn( ...classes: ( string | undefined | false | null )[] ): string {
 	return classes.filter( Boolean ).join( ' ' );

@@ -160,8 +160,14 @@ class Taxonomy {
 		if ( isset( $data['is_active'] ) ) {
 			$update['is_active'] = (int) $data['is_active'];
 		}
-		if ( array_key_exists( 'is_global', $data ) ) {
-			$update['workspace_id'] = $data['is_global'] ? null : (int) $data['workspace_id'];
+
+		// Scope changes (is_global / workspace_id) MUST be authorised by the
+		// controller before reaching this method — passing `allow_scope_change`
+		// is the explicit opt-in. Without it we silently drop scope mutations so
+		// a workspace member cannot promote a taxonomy to global or move it to
+		// another workspace by including these fields in an edit payload.
+		if ( ! empty( $data['allow_scope_change'] ) && array_key_exists( 'is_global', $data ) ) {
+			$update['workspace_id'] = $data['is_global'] ? null : (int) ( $data['workspace_id'] ?? 0 );
 		}
 
 		if ( empty( $update ) ) {
