@@ -2,6 +2,7 @@
  * External dependencies
  */
 import { useState, useEffect } from '@wordpress/element';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
@@ -29,6 +30,12 @@ import StatusesSection from './StatusesSection';
 import LabelsSection from './LabelsSection';
 
 type Section = 'profile' | 'general' | 'statuses' | 'labels' | 'notifications' | 'data';
+
+const SECTIONS: Section[] = [ 'profile', 'general', 'statuses', 'labels', 'notifications', 'data' ];
+const DEFAULT_SECTION: Section = 'profile';
+
+const isSection = ( v: string | undefined ): v is Section =>
+	!! v && ( SECTIONS as string[] ).includes( v );
 
 interface Settings {
 	tasks_per_page?: number;
@@ -114,8 +121,17 @@ const ToggleRow = ( {
 
 /* ---- Main ---- */
 const SettingsPage = () => {
-	const [ activeSection, setActiveSection ] = useState<Section>( 'profile' );
-	const [ form, setForm ]                   = useState<Settings>( {} );
+	const { section }    = useParams<{ section: string }>();
+	const navigate       = useNavigate();
+	const activeSection: Section = isSection( section ) ? section : DEFAULT_SECTION;
+
+	const [ form, setForm ] = useState<Settings>( {} );
+
+	useEffect( () => {
+		if ( section && ! isSection( section ) ) {
+			navigate( `/settings/${ DEFAULT_SECTION }`, { replace: true } );
+		}
+	}, [ section, navigate ] );
 
 	const { data: settings, isLoading } = useQuery<Settings>( {
 		queryKey: [ 'settings' ],
@@ -166,7 +182,7 @@ const SettingsPage = () => {
 							<button
 								key={ item.id }
 								className={ `st-todox-settings-sidenav__item ${ active ? 'st-todox-settings-sidenav__item--active' : '' }` }
-								onClick={ () => setActiveSection( item.id ) }
+								onClick={ () => navigate( `/settings/${ item.id }` ) }
 							>
 								<Icon size={ 15 } className="st-todox-settings-sidenav__icon" />
 								<span>{ item.label }</span>
