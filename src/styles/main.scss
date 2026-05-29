@@ -2267,8 +2267,10 @@ body.st-todox {
   align-items: center;
   gap: 10px;
   padding: 9px 20px;
+  margin-bottom: 12px;
   background: var(--st-todox-primary-faint);
-  border-bottom: 1px solid var(--st-todox-primary-soft);
+  border: 1px solid var(--st-todox-primary-soft);
+  border-radius: 8px;
 
   &__count {
     font-size: 12.5px;

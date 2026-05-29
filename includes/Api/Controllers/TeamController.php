@@ -20,6 +20,14 @@ class TeamController extends RestApi {
 	protected $base = 'teams';
 
 	public function routes(): void {
+		$by_id = function ( \WP_REST_Request $req ) {
+			$ws_id = Team::get_workspace_id( (int) $req->get_param( 'id' ) );
+			if ( $ws_id === null ) {
+				return new \WP_Error( 'rest_not_found', esc_html__( 'Team not found.', 'softtent-todox' ), [ 'status' => 404 ] );
+			}
+			return $this->can_access_workspace( $ws_id );
+		};
+
 		$by_reorder = function ( \WP_REST_Request $req ) {
 			$items = $req->get_param( 'items' );
 			if ( ! is_array( $items ) || empty( $items ) ) {
@@ -27,7 +35,10 @@ class TeamController extends RestApi {
 			}
 			$first_id = (int) ( $items[0]['id'] ?? 0 );
 			$ws_id    = Team::get_workspace_id( $first_id );
-			return $ws_id ? $this->can_access_workspace( $ws_id ) : false;
+			if ( $ws_id === null ) {
+				return new \WP_Error( 'rest_not_found', esc_html__( 'Team not found.', 'softtent-todox' ), [ 'status' => 404 ] );
+			}
+			return $this->can_access_workspace( $ws_id );
 		};
 
 		register_rest_route(
@@ -60,17 +71,17 @@ class TeamController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'show' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods' => 'PUT',
 					'callback' => [ $this, 'update' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods' => 'DELETE',
 					'callback' => [ $this, 'destroy' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 			]
         );
@@ -80,12 +91,12 @@ class TeamController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'members' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'add_member' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 			]
         );
@@ -95,7 +106,7 @@ class TeamController extends RestApi {
 				[
 					'methods' => 'DELETE',
 					'callback' => [ $this, 'remove_member' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 			]
         );

@@ -785,29 +785,29 @@ class Task {
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function resolve_labels( array $ids ): array {
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $ids ) ) ) );
 		if ( empty( $ids ) ) {
 			return [];
 		}
 
 		global $wpdb;
 
-		$tt      = $wpdb->prefix . 'st_todox_taxonomies';
-		$id_list = implode( ',', array_map( 'intval', $ids ) );
+		$tt           = $wpdb->prefix . 'st_todox_taxonomies';
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT id, name, color FROM %i WHERE FIND_IN_SET(id, %s)',
-				$tt,
-				$id_list
+				"SELECT id, name, color FROM `{$tt}` WHERE id IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+				...$ids
 			),
 			ARRAY_A
 		);
 
 		return array_map(
 			fn( $r ) => [
-				'id' => (int) $r['id'],
-				'name' => $r['name'],
+				'id'    => (int) $r['id'],
+				'name'  => $r['name'],
 				'color' => $r['color'],
             ],
 			$rows ?? []

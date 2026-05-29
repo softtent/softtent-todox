@@ -27,12 +27,13 @@ import {
 	GripVertical,
 	Plus,
 	CheckSquare,
+	Pencil,
 } from 'lucide-react';
 
 /**
  * Internal dependencies
  */
-import { tasksApi } from '../../api';
+import { tasksApi, usersApi } from '../../api';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useTaskStatuses } from '../../hooks/useTaskStatuses';
 import PageHeader from '../../components/ui/PageHeader';
@@ -40,12 +41,13 @@ import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import PriorityBadge from '../../components/ui/PriorityBadge';
 import Avatar from '../../components/ui/Avatar';
+import TablePickerMenu from '../../components/ui/TablePickerMenu';
 import CreateTaskModal from '../../components/features/task/CreateTaskModal';
 import InlineTaskInput from '../../components/features/task/InlineTaskInput';
 import TaskDetailModal from '../../components/features/task/TaskDetailModal';
 import ViewSwitcher from '../../components/features/task/ViewSwitcher';
 import { formatDate, isOverdue } from '../../utils/helpers';
-import type { Task } from '../../types';
+import type { Task, TaskPriority, User } from '../../types';
 
 /* ---- Subtask progress bar ---- */
 const SubtaskProgress = ( { total, done }: { total: number; done: number } ) => {
@@ -69,12 +71,18 @@ const SubtaskProgress = ( { total, done }: { total: number; done: number } ) => 
 const TaskCard = ( {
 	task,
 	isDragging = false,
+	users,
 	onClick,
+	onUpdate,
 }: {
-	task: Task;
+	task:       Task;
 	isDragging?: boolean;
-	onClick: () => void;
+	users:      User[];
+	onClick:    () => void;
+	onUpdate:   ( id: number, data: Partial<Task> ) => void;
 } ) => {
+	const [ dueDateEditing, setDueDateEditing ] = useState( false );
+
 	const {
 		attributes,
 		listeners,
@@ -90,10 +98,10 @@ const TaskCard = ( {
 		opacity: isSortableDragging ? 0.35 : 1,
 	};
 
-	const overdue       = isOverdue( task.due_date );
-	const subtaskTotal  = task.subtask_counts?.total ?? task.subtasks?.length ?? 0;
-	const subtaskDone   = task.subtask_counts?.completed ?? task.subtasks?.filter( ( s ) => s.completed ).length ?? 0;
-	const hasLabels     = ( task.labels?.length ?? 0 ) > 0;
+	const overdue      = isOverdue( task.due_date );
+	const subtaskTotal = task.subtask_counts?.total ?? task.subtasks?.length ?? 0;
+	const subtaskDone  = task.subtask_counts?.completed ?? task.subtasks?.filter( ( s ) => s.completed ).length ?? 0;
+	const hasLabels    = ( task.labels?.length ?? 0 ) > 0;
 
 	return (
 		<div
@@ -126,31 +134,101 @@ const TaskCard = ( {
 			{/* Title */}
 			<p className="st-todox-kanban-card__title">{ task.title }</p>
 
-			{/* Meta row */}
+			{/* Meta row — priority + due date */}
 			<div className="st-todox-kanban-card__meta">
-				<PriorityBadge priority={ task.priority } />
-				{ task.due_date && (
-					<span className={ `st-todox-kanban-card__due ${ overdue ? 'st-todox-kanban-card__due--overdue' : '' }` }>
-						<Calendar size={ 11 } />
-						{ formatDate( task.due_date ) }
-					</span>
-				) }
-			</div>
 
-			{/* Footer */}
-			{ ( task.assignee || subtaskTotal > 0 ) && (
-				<div className="st-todox-kanban-card__footer">
-					{ subtaskTotal > 0 && (
-						<SubtaskProgress total={ subtaskTotal } done={ subtaskDone } />
-					) }
-					{ task.assignee && (
-						<div className="st-todox-kanban-card__assignee">
-							<Avatar name={ task.assignee.name } src={ task.assignee.avatar } size={ 22 } />
-							<span className="st-todox-kanban-card__assignee-name">{ task.assignee.name }</span>
-						</div>
+				{/* Priority picker */}
+				<div onClick={ ( e ) => e.stopPropagation() }>
+					<TablePickerMenu trigger={ <PriorityBadge priority={ task.priority } /> } title="Change priority">
+						{ ( [ 'low', 'medium', 'high', 'urgent' ] as TaskPriority[] ).map( ( p ) => (
+							<button
+								key={ p }
+								className={ `st-todox-inline-picker__item ${ task.priority === p ? 'st-todox-inline-picker__item--active' : '' }` }
+								onClick={ () => onUpdate( task.id, { priority: p } ) }
+							>
+								<PriorityBadge priority={ p } />
+							</button>
+						) ) }
+					</TablePickerMenu>
+				</div>
+
+				{/* Due date picker */}
+				<div onClick={ ( e ) => e.stopPropagation() }>
+					{ dueDateEditing ? (
+						<input
+							type="date"
+							className="st-todox-form__input st-todox-td-meta-date-input"
+							defaultValue={ task.due_date ?? '' }
+							autoFocus
+							onChange={ ( e ) => {
+								onUpdate( task.id, { due_date: e.target.value || null } as Partial<Task> );
+								setDueDateEditing( false );
+							} }
+							onBlur={ () => setDueDateEditing( false ) }
+							onKeyDown={ ( e ) => { if ( e.key === 'Escape' ) setDueDateEditing( false ); } }
+						/>
+					) : (
+						<button
+							className="st-todox-inline-picker__trigger"
+							onClick={ () => setDueDateEditing( true ) }
+							title="Set due date"
+						>
+							{ task.due_date ? (
+								<span className={ `st-todox-kanban-card__due ${ overdue ? 'st-todox-kanban-card__due--overdue' : '' }` }>
+									<Calendar size={ 11 } />
+									{ formatDate( task.due_date ) }
+								</span>
+							) : (
+								<span className="st-todox-text--muted" style={ { fontSize: 11 } }>No date</span>
+							) }
+							<Pencil size={ 9 } className="st-todox-inline-picker__chevron" />
+						</button>
 					) }
 				</div>
-			) }
+
+			</div>
+
+			{/* Footer — subtask progress + assignee */}
+			<div className="st-todox-kanban-card__footer">
+				{ subtaskTotal > 0 && (
+					<SubtaskProgress total={ subtaskTotal } done={ subtaskDone } />
+				) }
+
+				{/* Assignee picker */}
+				<div onClick={ ( e ) => e.stopPropagation() } style={ { marginLeft: 'auto' } }>
+					<TablePickerMenu
+						trigger={
+							task.assignee ? (
+								<div className="st-todox-kanban-card__assignee">
+									<Avatar name={ task.assignee.name } src={ task.assignee.avatar } size={ 20 } />
+									<span className="st-todox-kanban-card__assignee-name">{ task.assignee.name }</span>
+								</div>
+							) : (
+								<span className="st-todox-text--muted" style={ { fontSize: 11 } }>Unassigned</span>
+							)
+						}
+						title="Change assignee"
+					>
+						<button
+							className={ `st-todox-inline-picker__item ${ ! task.assignee_id ? 'st-todox-inline-picker__item--active' : '' }` }
+							onClick={ () => onUpdate( task.id, { assignee_id: null } as Partial<Task> ) }
+						>
+							<span style={ { width: 16, height: 16, borderRadius: '50%', border: '1.5px dashed #94a3b8', display: 'inline-block', flexShrink: 0 } } />
+							Unassigned
+						</button>
+						{ users.map( ( u ) => (
+							<button
+								key={ u.id }
+								className={ `st-todox-inline-picker__item ${ task.assignee_id === u.id ? 'st-todox-inline-picker__item--active' : '' }` }
+								onClick={ () => onUpdate( task.id, { assignee_id: u.id } ) }
+							>
+								<Avatar name={ u.name } src={ u.avatar } size={ 16 } />
+								{ u.name }
+							</button>
+						) ) }
+					</TablePickerMenu>
+				</div>
+			</div>
 		</div>
 	);
 };
@@ -159,13 +237,17 @@ const TaskCard = ( {
 const KanbanColumnComponent = ( {
 	column,
 	tasks,
+	users,
 	onTaskClick,
+	onTaskUpdate,
 	onCreated,
 }: {
-	column: { id: string; title: string; color: string; statusId: number | null };
-	tasks: Task[];
-	onTaskClick: ( id: number ) => void;
-	onCreated: () => void;
+	column:       { id: string; title: string; color: string; statusId: number | null };
+	tasks:        Task[];
+	users:        User[];
+	onTaskClick:  ( id: number ) => void;
+	onTaskUpdate: ( id: number, data: Partial<Task> ) => void;
+	onCreated:    () => void;
 } ) => {
 	const taskIds = tasks.map( ( t ) => `task-${ t.id }` );
 
@@ -200,7 +282,9 @@ const KanbanColumnComponent = ( {
 						<TaskCard
 							key={ task.id }
 							task={ task }
+							users={ users }
 							onClick={ () => onTaskClick( task.id ) }
+							onUpdate={ onTaskUpdate }
 						/>
 					) ) }
 					{ tasks.length === 0 && (
@@ -271,6 +355,14 @@ const KanbanPage = () => {
 
 	const isLoading = statusesLoading || tasksLoading;
 
+	const { data: usersData } = useQuery( {
+		queryKey: [ 'users', 'workspace', activeWorkspaceId ],
+		queryFn:  () => usersApi.getAll( { workspace_id: activeWorkspaceId!, per_page: 100 } ),
+		enabled:  !! activeWorkspaceId,
+		staleTime: 60_000,
+	} );
+	const users = usersData?.items ?? [];
+
 	const reorderMutation = useMutation( {
 		mutationFn: ( items: Array<{ id: number; position: number; status: string }> ) =>
 			tasksApi.reorder( items ),
@@ -279,6 +371,18 @@ const KanbanPage = () => {
 			qc.invalidateQueries( { queryKey: [ 'tasks', 'kanban', activeWorkspaceId ] } );
 		},
 	} );
+
+	const updateMutation = useMutation( {
+		mutationFn: ( { id, data }: { id: number; data: Partial<Task> } ) =>
+			tasksApi.update( id, data ),
+		onSuccess: () => qc.invalidateQueries( { queryKey: [ 'tasks', 'kanban', activeWorkspaceId ] } ),
+		onError:   ( err: Error ) => toast.error( err.message ),
+	} );
+
+	const handleTaskUpdate = useCallback(
+		( id: number, data: Partial<Task> ) => updateMutation.mutate( { id, data } ),
+		[ updateMutation ]
+	);
 
 	const getTaskIdFromDndId = ( dndId: string ) => Number( String( dndId ).replace( 'task-', '' ) );
 
@@ -403,7 +507,9 @@ const KanbanPage = () => {
 								key={ s.value }
 								column={ { id: s.value, title: s.label, color: s.color, statusId: s.id } }
 								tasks={ columns[ s.value ] ?? [] }
+								users={ users }
 								onTaskClick={ ( id ) => setSelectedTaskId( id ) }
+								onTaskUpdate={ handleTaskUpdate }
 								onCreated={ handleCreated }
 							/>
 						) ) }

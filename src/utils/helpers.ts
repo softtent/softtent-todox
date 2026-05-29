@@ -40,7 +40,13 @@ export function isOverdue( dueDate: string | null | undefined ): boolean {
 	const d = parseDate( dueDate );
 	if ( ! d ) return false;
 
-	return d < new Date() && d.toDateString() !== new Date().toDateString();
+	// Compare calendar dates only — a task whose due date is today is NOT overdue,
+	// only a task whose due date is strictly before today.
+	const today = new Date();
+	today.setHours( 0, 0, 0, 0 );
+	d.setHours( 0, 0, 0, 0 );
+
+	return d.getTime() < today.getTime();
 }
 
 export function priorityColor( priority: TaskPriority ): string {

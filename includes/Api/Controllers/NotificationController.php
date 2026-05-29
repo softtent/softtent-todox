@@ -23,7 +23,7 @@ class NotificationController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'index' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'is_app_user' ],
 				],
 			]
         );
@@ -33,7 +33,7 @@ class NotificationController extends RestApi {
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'mark_all_read' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'is_app_user' ],
 				],
 			]
         );
@@ -43,7 +43,7 @@ class NotificationController extends RestApi {
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'mark_read' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'is_app_user' ],
 				],
 			]
         );
@@ -53,7 +53,7 @@ class NotificationController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'unread_count' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'is_app_user' ],
 				],
 			]
         );

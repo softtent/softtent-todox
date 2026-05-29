@@ -66,6 +66,7 @@ const TablePickerMenu = ( { trigger, children, title }: TablePickerMenuProps ) =
 					ref={ menuRef }
 					className="st-todox-inline-picker__menu"
 					style={ menuStyle }
+					onClick={ () => setIsOpen( false ) }
 				>
 					{ children }
 				</div>,

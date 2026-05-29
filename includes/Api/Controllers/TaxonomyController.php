@@ -20,6 +20,46 @@ class TaxonomyController extends RestApi {
 	protected $base = 'taxonomies';
 
 	public function routes(): void {
+		$by_taxonomy_id = function ( \WP_REST_Request $req ) {
+			$ws_id = Taxonomy::get_workspace_id( (int) $req->get_param( 'id' ) );
+			if ( $ws_id === null ) {
+				return new \WP_Error(
+					'rest_not_found',
+					esc_html__( 'Taxonomy not found.', 'softtent-todox' ),
+					[ 'status' => 404 ]
+				);
+			}
+			// Global taxonomies (workspace_id NULL → 0) require admin to edit.
+			if ( $ws_id === 0 ) {
+				return $this->is_admin( $req );
+			}
+			return $this->can_access_workspace( $ws_id );
+		};
+
+		$by_reorder_items = function ( \WP_REST_Request $req ) {
+			$items = $req->get_param( 'items' );
+			if ( ! is_array( $items ) || empty( $items ) ) {
+				return new \WP_Error(
+					'rest_invalid_items',
+					esc_html__( 'Items array is required.', 'softtent-todox' ),
+					[ 'status' => 400 ]
+				);
+			}
+			$first_id = (int) ( $items[0]['id'] ?? 0 );
+			$ws_id    = Taxonomy::get_workspace_id( $first_id );
+			if ( $ws_id === null ) {
+				return new \WP_Error(
+					'rest_not_found',
+					esc_html__( 'Taxonomy not found.', 'softtent-todox' ),
+					[ 'status' => 404 ]
+				);
+			}
+			if ( $ws_id === 0 ) {
+				return $this->is_admin( $req );
+			}
+			return $this->can_access_workspace( $ws_id );
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base, [
 				[
@@ -30,7 +70,7 @@ class TaxonomyController extends RestApi {
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'is_logged_in' ],
 				],
 			]
         );
@@ -40,7 +80,7 @@ class TaxonomyController extends RestApi {
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'reorder' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_reorder_items,
 				],
 			]
         );
@@ -50,12 +90,12 @@ class TaxonomyController extends RestApi {
 				[
 					'methods' => 'PUT',
 					'callback' => [ $this, 'update' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_taxonomy_id,
 				],
 				[
 					'methods' => 'DELETE',
 					'callback' => [ $this, 'destroy' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_taxonomy_id,
 				],
 			]
         );
@@ -90,10 +130,19 @@ class TaxonomyController extends RestApi {
 		$is_global    = (bool) $req->get_param( 'is_global' );
 		$workspace_id = null;
 
-		if ( ! $is_global ) {
+		if ( $is_global ) {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				return $this->error( esc_html__( 'Only administrators can create global taxonomies.', 'softtent-todox' ), 403 );
+			}
+		} else {
 			$workspace_id = (int) $req->get_param( 'workspace_id' );
 			if ( ! $workspace_id ) {
 				return $this->error( esc_html__( 'workspace_id is required for workspace-scoped taxonomies.', 'softtent-todox' ) );
+			}
+
+			$access = $this->can_access_workspace( $workspace_id );
+			if ( $access !== true ) {
+				return $this->error( esc_html__( 'You are not a member of this workspace.', 'softtent-todox' ), 403 );
 			}
 		}
 

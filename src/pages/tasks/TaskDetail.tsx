@@ -324,9 +324,11 @@ const TaskDetail = ( { taskId: taskIdProp, onClose }: TaskDetailProps = {} ) => 
 
 	const { statuses: taskStatuses } = useTaskStatuses();
 
+	const taskWorkspaceId = task?.workspace_id ?? 0;
 	const { data: usersData } = useQuery( {
-		queryKey: [ 'users', 'all' ],
-		queryFn:  () => usersApi.getAll( { per_page: 100 } ),
+		queryKey: [ 'users', 'workspace', taskWorkspaceId ],
+		queryFn:  () => usersApi.getAll( { workspace_id: taskWorkspaceId, per_page: 100 } ),
+		enabled:  !! taskWorkspaceId,
 		staleTime: 5 * 60_000,
 	} );
 	const users = usersData?.items ?? [];

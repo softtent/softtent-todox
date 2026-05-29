@@ -6,6 +6,7 @@ defined( 'ABSPATH' ) || exit;
 
 use SoftTent\TodoX\Abstracts\RestApi;
 use SoftTent\TodoX\Models\Subtask;
+use SoftTent\TodoX\Models\Task;
 use SoftTent\TodoX\Traits\Sanitizer;
 
 /**
@@ -22,17 +23,29 @@ class SubtaskController extends RestApi {
 	protected $base = 'tasks';
 
 	public function routes(): void {
+		$by_task_id = function ( \WP_REST_Request $req ) {
+			$workspace_id = Task::get_workspace_id( (int) $req->get_param( 'task_id' ) );
+			if ( $workspace_id === null ) {
+				return new \WP_Error(
+					'rest_task_not_found',
+					esc_html__( 'Task not found.', 'softtent-todox' ),
+					[ 'status' => 404 ]
+				);
+			}
+			return $this->can_access_workspace( $workspace_id );
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base . '/(?P<task_id>\d+)/subtasks', [
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'index' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 			]
         );
@@ -42,7 +55,7 @@ class SubtaskController extends RestApi {
 				[
 					'methods'             => 'POST',
 					'callback'            => [ $this, 'reorder' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 			]
 		);
@@ -52,17 +65,17 @@ class SubtaskController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'show' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 				[
 					'methods' => 'PUT',
 					'callback' => [ $this, 'update' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 				[
 					'methods' => 'DELETE',
 					'callback' => [ $this, 'destroy' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_task_id,
 				],
 			]
         );

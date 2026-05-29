@@ -70,9 +70,9 @@ const SubtaskModal = ( { isOpen, onClose, taskId, workspaceId, subtask, onSaved 
 	}, [ isOpen, subtask, subtaskStatuses ] );
 
 	const { data: usersData } = useQuery( {
-		queryKey: [ 'users', 'all' ],
-		queryFn:  () => usersApi.getAll( { per_page: 100 } ),
-		enabled:  isOpen,
+		queryKey: [ 'users', 'workspace', workspaceId ],
+		queryFn:  () => usersApi.getAll( { workspace_id: workspaceId, per_page: 100 } ),
+		enabled:  isOpen && !! workspaceId,
 		staleTime: 5 * 60_000,
 	} );
 	const users = usersData?.items ?? [];

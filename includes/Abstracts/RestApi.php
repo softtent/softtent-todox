@@ -56,32 +56,95 @@ abstract class RestApi extends WP_REST_Controller {
 	}
 
 	/**
-	 * Permission check: user must be a workspace member.
+	 * Permission check: user must be logged in.
 	 *
-	 * Reads workspace_id from route param or request body.
+	 * Use this only for endpoints whose only requirement is authentication
+	 * (e.g. the workspaces list, which is filtered server-side to the user's
+	 * own memberships). For everything that touches workspace data, prefer
+	 * is_app_user() or can_access_workspace().
 	 *
 	 * @since 0.1.0
 	 */
-	public function is_workspace_member( \WP_REST_Request $req ): bool|WP_Error {
+	public function is_logged_in( \WP_REST_Request $req ): bool|WP_Error {
+		unset( $req );
+
 		if ( ! is_user_logged_in() ) {
-			return new WP_Error( 'rest_not_logged_in', esc_html__( 'Authentication required.', 'softtent-todox' ), [ 'status' => 401 ] );
+			return new WP_Error(
+				'rest_not_logged_in',
+				esc_html__( 'Authentication required.', 'softtent-todox' ),
+				[ 'status' => 401 ]
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Permission check: caller is an authorised app user.
+	 *
+	 * For a task-management app, "logged in" is too weak — every WordPress
+	 * subscriber/customer would qualify. We additionally require:
+	 *
+	 *   1. A configurable WP capability (default `read`, filterable via
+	 *      `st_todox_app_capability`). Sites can raise this to `edit_posts`
+	 *      or a custom cap to keep low-privileged accounts out.
+	 *   2. Membership of at least one workspace, OR `manage_options`. This
+	 *      prevents arbitrary logged-in users from probing user-scoped
+	 *      endpoints (notifications, /users/me, member lookups) when they
+	 *      have never been invited to a workspace.
+	 *
+	 * @since 0.2.0
+	 */
+	public function is_app_user( \WP_REST_Request $req ): bool|WP_Error {
+		unset( $req );
+
+		if ( ! is_user_logged_in() ) {
+			return new WP_Error(
+				'rest_not_logged_in',
+				esc_html__( 'Authentication required.', 'softtent-todox' ),
+				[ 'status' => 401 ]
+			);
+		}
+
+		$capability = (string) apply_filters( 'st_todox_app_capability', 'read' );
+
+		if ( $capability !== '' && ! current_user_can( $capability ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				esc_html__( 'You do not have permission to use this app.', 'softtent-todox' ),
+				[ 'status' => 403 ]
+			);
 		}
 
 		if ( current_user_can( 'manage_options' ) ) {
 			return true;
 		}
 
-		$workspace_id = (int) ( $req->get_param( 'workspace_id' ) ?? 0 );
-
-		if ( ! $workspace_id ) {
-			return true;
-		}
-
-		if ( ! Workspace::is_member( $workspace_id, get_current_user_id() ) ) {
-			return new WP_Error( 'rest_forbidden', esc_html__( 'You are not a member of this workspace.', 'softtent-todox' ), [ 'status' => 403 ] );
+		if ( ! Workspace::has_any_membership( get_current_user_id() ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				esc_html__( 'You are not a member of any workspace.', 'softtent-todox' ),
+				[ 'status' => 403 ]
+			);
 		}
 
 		return true;
+	}
+
+	/**
+	 * Permission check: user must be a member of the workspace specified in
+	 * the request `workspace_id` parameter.
+	 *
+	 * Unlike the previous behaviour, this denies when workspace_id is missing
+	 * — callers must provide a workspace context. Routes that resolve the
+	 * workspace from a resource ID should use can_access_workspace() directly.
+	 *
+	 * @since 0.1.0
+	 */
+	public function is_workspace_member( \WP_REST_Request $req ): bool|WP_Error {
+		$workspace_id = (int) ( $req->get_param( 'workspace_id' ) ?? 0 );
+
+		return $this->can_access_workspace( $workspace_id );
 	}
 
 	/**

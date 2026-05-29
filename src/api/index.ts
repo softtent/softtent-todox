@@ -96,9 +96,22 @@ export const notificationsApi = {
 };
 
 // ---- Users ----
+export interface UsersQuery {
+	workspace_id?: number;
+	search?: string;
+	page?: number;
+	per_page?: number;
+}
+
 export const usersApi = {
-	getAll: ( params?: Record< string, unknown > ) =>
-		api.get< PaginatedResponse< User > >( 'users', params ),
+	/**
+	 * List users. Pass `workspace_id` to scope to that workspace's members
+	 * (the normal case for assignee/manager pickers). Omitting it returns the
+	 * full WP user table and is restricted to admins on the server, so it
+	 * should only be used by invite UIs.
+	 */
+	getAll: ( params: UsersQuery = {} ) =>
+		api.get< PaginatedResponse< User > >( 'users', params as Record< string, unknown > ),
 	me: () => api.get< User >( 'users/me' ),
 };
 

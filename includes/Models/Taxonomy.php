@@ -185,6 +185,32 @@ class Taxonomy {
 		return $result;
 	}
 
+	/**
+	 * Get the workspace ID for a taxonomy row.
+	 *
+	 * Returns 0 for global rows (workspace_id IS NULL), and null when the row
+	 * does not exist.
+	 */
+	public static function get_workspace_id( int $id ): ?int {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				'SELECT workspace_id FROM %i WHERE id = %d',
+				$wpdb->prefix . self::$table,
+				$id
+			),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return null;
+		}
+
+		return $row['workspace_id'] !== null ? (int) $row['workspace_id'] : 0;
+	}
+
 	public static function reorder( array $items ): void {
 		global $wpdb;
 

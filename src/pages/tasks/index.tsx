@@ -367,8 +367,9 @@ const TasksPage = () => {
 	} );
 
 	const { data: usersData } = useQuery( {
-		queryKey: [ 'users' ],
-		queryFn:  () => usersApi.getAll( { per_page: 100 } ),
+		queryKey: [ 'users', 'workspace', activeWorkspaceId ],
+		queryFn:  () => usersApi.getAll( { workspace_id: activeWorkspaceId!, per_page: 100 } ),
+		enabled:  !! activeWorkspaceId,
 		staleTime: 60_000,
 	} );
 	const users = usersData?.items ?? [];

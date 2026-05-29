@@ -39,7 +39,7 @@ class SettingsController extends RestApi {
 		];
 	}
 
-	public function index( \WP_REST_Request $request ): \WP_REST_Response { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable
+	public function index( \WP_REST_Request $_request ): \WP_REST_Response {
 		return $this->ok( array_merge( $this->defaults(), get_option( Keys::SETTINGS, [] ) ) );
 	}
 

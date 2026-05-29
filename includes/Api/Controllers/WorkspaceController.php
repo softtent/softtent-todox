@@ -30,17 +30,21 @@ class WorkspaceController extends RestApi {
 	protected $base = 'workspaces';
 
 	public function routes(): void {
+		$by_id = function ( \WP_REST_Request $req ) {
+			return $this->can_access_workspace( (int) $req->get_param( 'id' ) );
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base, [
 				[
 					'methods'             => 'GET',
 					'callback'            => [ $this, 'index' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'is_logged_in' ],
 				],
 				[
 					'methods'             => 'POST',
 					'callback'            => [ $this, 'store' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'is_logged_in' ],
 				],
 			]
         );
@@ -50,17 +54,17 @@ class WorkspaceController extends RestApi {
 				[
 					'methods'             => 'GET',
 					'callback'            => [ $this, 'show' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods'             => 'PUT',
 					'callback'            => [ $this, 'update' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods'             => 'DELETE',
 					'callback'            => [ $this, 'destroy' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 			]
         );
@@ -70,12 +74,12 @@ class WorkspaceController extends RestApi {
 				[
 					'methods'             => 'GET',
 					'callback'            => [ $this, 'members' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods'             => 'POST',
 					'callback'            => [ $this, 'add_member' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 			]
         );
@@ -85,7 +89,7 @@ class WorkspaceController extends RestApi {
 				[
 					'methods'             => 'DELETE',
 					'callback'            => [ $this, 'remove_member' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 			]
         );
@@ -185,7 +189,7 @@ class WorkspaceController extends RestApi {
 	public function add_member( \WP_REST_Request $req ): \WP_REST_Response {
 		$id      = (int) $req->get_param( 'id' );
 		$user_id = (int) ( $req->get_param( 'user_id' ) ?? 0 );
-		$role    = $req->get_param( 'role' ) ?? 'member';
+		$role    = (string) ( $req->get_param( 'role' ) ?? 'member' );
 
 		if ( ! $this->can_manage( $id ) ) {
 			return $this->error( esc_html__( 'Access denied.', 'softtent-todox' ), 403 );
@@ -193,6 +197,16 @@ class WorkspaceController extends RestApi {
 
 		if ( ! get_userdata( $user_id ) ) {
 			return $this->error( esc_html__( 'User not found.', 'softtent-todox' ), 404 );
+		}
+
+		// Only the workspace owner (or site admin) may grant the 'owner' role,
+		// otherwise privilege escalation is possible from any workspace admin.
+		if ( $role === 'owner' ) {
+			$workspace = Workspace::get( $id );
+			$is_owner  = $workspace && (int) $workspace['owner_id'] === $this->current_user_id();
+			if ( ! $is_owner && ! current_user_can( 'manage_options' ) ) {
+				$role = 'admin';
+			}
 		}
 
 		Workspace::add_member( $id, $user_id, $role );

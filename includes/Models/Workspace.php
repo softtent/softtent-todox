@@ -305,22 +305,16 @@ class Workspace {
 
 		$table_members = $wpdb->prefix . self::$members_table;
 		$users_table   = $wpdb->users;
-		$id_list       = implode( ',', $ids );
+		$placeholders  = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$query = "SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.display_name as name, u.user_email as email FROM `{$table_members}` wm INNER JOIN `{$users_table}` u ON u.ID = wm.user_id WHERE wm.workspace_id IN ({$placeholders}) ORDER BY wm.joined_at ASC";
+
 		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT wm.workspace_id, wm.user_id, wm.role, wm.joined_at, u.display_name as name, u.user_email as email
-				FROM %i wm
-				INNER JOIN %i u ON u.ID = wm.user_id
-				WHERE FIND_IN_SET(wm.workspace_id, %s)
-				ORDER BY wm.joined_at ASC',
-				$table_members,
-				$users_table,
-				$id_list
-			),
+			$wpdb->prepare( $query, ...$ids ),
 			ARRAY_A
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		$map = [];
 		foreach ( $rows ?? [] as $row ) {
@@ -336,6 +330,32 @@ class Workspace {
 		}
 
 		return $map;
+	}
+
+	/**
+	 * Whether the user is a member of at least one workspace.
+	 *
+	 * Used as a coarse "this person has any business calling the app at all"
+	 * gate so subscribers/customers with no workspace membership cannot probe
+	 * user-scoped endpoints (notifications, /users/me) just by being logged in.
+	 *
+	 * @since 0.2.0
+	 */
+	public static function has_any_membership( int $user_id ): bool {
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT id FROM %i WHERE user_id = %d LIMIT 1',
+				$wpdb->prefix . self::$members_table,
+				$user_id
+			)
+		);
 	}
 
 	/**

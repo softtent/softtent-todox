@@ -6,6 +6,7 @@ defined( 'ABSPATH' ) || exit;
 
 use SoftTent\TodoX\Abstracts\RestApi;
 use SoftTent\TodoX\Models\Sprint;
+use SoftTent\TodoX\Models\Project;
 use SoftTent\TodoX\Traits\Sanitizer;
 
 /**
@@ -20,6 +21,22 @@ class SprintController extends RestApi {
 	protected $base = 'sprints';
 
 	public function routes(): void {
+		$by_id = function ( \WP_REST_Request $req ) {
+			$ws_id = Sprint::get_workspace_id( (int) $req->get_param( 'id' ) );
+			if ( $ws_id === null ) {
+				return new \WP_Error( 'rest_not_found', esc_html__( 'Sprint not found.', 'softtent-todox' ), [ 'status' => 404 ] );
+			}
+			return $this->can_access_workspace( $ws_id );
+		};
+
+		$by_project_id = function ( \WP_REST_Request $req ) {
+			$ws_id = Project::get_workspace_id( (int) $req->get_param( 'project_id' ) );
+			if ( $ws_id === null ) {
+				return new \WP_Error( 'rest_not_found', esc_html__( 'Project not found.', 'softtent-todox' ), [ 'status' => 404 ] );
+			}
+			return $this->can_access_workspace( $ws_id );
+		};
+
 		$by_reorder = function ( \WP_REST_Request $req ) {
 			$items = $req->get_param( 'items' );
 			if ( ! is_array( $items ) || empty( $items ) ) {
@@ -27,7 +44,10 @@ class SprintController extends RestApi {
 			}
 			$first_id = (int) ( $items[0]['id'] ?? 0 );
 			$ws_id    = Sprint::get_workspace_id( $first_id );
-			return $ws_id ? $this->can_access_workspace( $ws_id ) : false;
+			if ( $ws_id === null ) {
+				return new \WP_Error( 'rest_not_found', esc_html__( 'Sprint not found.', 'softtent-todox' ), [ 'status' => 404 ] );
+			}
+			return $this->can_access_workspace( $ws_id );
 		};
 
 		register_rest_route(
@@ -35,12 +55,12 @@ class SprintController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'index' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_project_id,
 				],
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_project_id,
 				],
 			]
         );
@@ -60,17 +80,17 @@ class SprintController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'show' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods' => 'PUT',
 					'callback' => [ $this, 'update' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 				[
 					'methods' => 'DELETE',
 					'callback' => [ $this, 'destroy' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => $by_id,
 				],
 			]
         );
