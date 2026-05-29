@@ -4,7 +4,8 @@
 import { useState, useEffect } from '@wordpress/element';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Bell, Sun, Moon } from 'lucide-react';
+import { useDispatch } from '@wordpress/data';
+import { Search, Plus, Bell, Sun, Moon, Menu } from 'lucide-react';
 
 /**
  * Internal dependencies
@@ -12,6 +13,7 @@ import { Search, Plus, Bell, Sun, Moon } from 'lucide-react';
 import { notificationsApi } from '../../api';
 import CreateTaskModal from '../features/task/CreateTaskModal';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { STORE_NAME } from '../../store/workspace';
 
 const STORAGE_KEY = 'st-todox-theme';
 
@@ -41,6 +43,7 @@ const Topbar = () => {
 	const [ createTaskOpen, setCreateTaskOpen ] = useState( false );
 	const [ theme, setTheme ] = useState< 'light' | 'dark' >( getInitialTheme );
 	const { activeWorkspaceId } = useWorkspace();
+	const { toggleMobileDrawer } = useDispatch( STORE_NAME );
 
 	// Apply theme on mount and whenever it changes
 	useEffect( () => {
@@ -69,6 +72,16 @@ const Topbar = () => {
 	return (
 		<>
 			<header className="st-todox-topbar">
+				{/* Mobile hamburger — opens drawer below md breakpoint */}
+				<button
+					type="button"
+					className="st-todox-topbar__hamburger"
+					onClick={ () => toggleMobileDrawer() }
+					aria-label="Open navigation menu"
+				>
+					<Menu size={ 18 } />
+				</button>
+
 				{/* Search */}
 				<form onSubmit={ handleSearch } className="st-todox-topbar__search-form">
 					<div className={ `st-todox-topbar__search-wrap ${ searchFocused ? 'st-todox-topbar__search-wrap--focused' : '' }` }>

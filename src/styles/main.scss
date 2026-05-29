@@ -7782,3 +7782,435 @@ body.st-todox {
     background: #0f172a;
   }
 }
+
+// ============================================================
+// Responsive — Mobile drawer, adaptive topbar, fluid grids
+//
+// Breakpoints used throughout TodoX:
+//   - xs:  < 480px  (small phones)
+//   - sm:  < 768px  (phones; drawer-mode sidebar)
+//   - md:  < 1024px (tablets; condensed shell)
+//   - lg: >= 1024px (desktop default)
+// ============================================================
+
+// --- Hamburger button: hidden on desktop, visible on tablet/phone ---
+.st-todox-topbar__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 4px;
+  border-radius: 9px;
+  border: 1px solid var(--st-todox-border);
+  background: var(--st-todox-surface);
+  color: var(--st-todox-text-secondary);
+  transition: all 150ms ease;
+  flex-shrink: 0;
+
+  svg { display: block; }
+
+  &:hover {
+    border-color: var(--st-todox-border-hover);
+    color: var(--st-todox-text);
+    background: var(--st-todox-bg);
+  }
+}
+
+// --- Mobile drawer backdrop (only rendered when drawer is open) ---
+.st-todox-app__backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  border: 0;
+  cursor: pointer;
+  animation: st-todox-backdrop-in 180ms ease-out;
+}
+
+@keyframes st-todox-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes st-todox-drawer-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+// ============================================================
+// Tablet & below ( < 1024px )
+// ============================================================
+@media (max-width: 1023px) {
+  .st-todox-app__inner {
+    padding: 18px;
+  }
+
+  // Tighten dashboard banner padding
+  .st-todox-dashboard-banner {
+    padding: 22px 22px;
+  }
+
+  // Workspaces / cards / grids: keep auto-fill but tighter min
+  .st-todox-page-hd {
+    margin-bottom: 18px;
+  }
+}
+
+// ============================================================
+// Phone ( < 768px ) — sidebar becomes drawer
+// ============================================================
+@media (max-width: 767px) {
+
+  // App shell: sidebar is absolutely positioned drawer
+  .st-todox-app {
+    position: relative;
+  }
+
+  .st-todox-app__body {
+    width: 100%;
+  }
+
+  // Sidebar floats as drawer off-screen
+  .st-todox-sidebar,
+  .st-todox-sidebar.st-todox-sidebar--collapsed,
+  .st-todox-sidebar.st-todox-sidebar--expanded {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    width: 84%;
+    max-width: 320px;
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+  }
+
+  .st-todox-sidebar--drawer-open {
+    transform: translateX(0) !important;
+  }
+
+  // Hide the desktop collapse toggle inside the drawer
+  .st-todox-sidebar__float-toggle {
+    display: none !important;
+  }
+
+  // Show backdrop only when drawer is open
+  .st-todox-app--drawer-open .st-todox-app__backdrop {
+    display: block;
+  }
+
+  // Show hamburger button on phone
+  .st-todox-topbar__hamburger {
+    display: inline-flex;
+  }
+
+  // Topbar tightens padding
+  .st-todox-topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  // Search shrinks but stays usable
+  .st-todox-topbar__search-form {
+    max-width: none;
+  }
+
+  .st-todox-topbar__search-wrap {
+    padding: 6px 10px;
+  }
+
+  // Page content padding
+  .st-todox-app__inner {
+    padding: 14px;
+  }
+
+  .st-todox-page {
+    padding-bottom: 32px;
+  }
+
+  // Dashboard banner: stack vertically
+  .st-todox-dashboard {
+    gap: 18px;
+  }
+
+  .st-todox-dashboard-banner {
+    padding: 20px 18px;
+    border-radius: 16px;
+  }
+
+  .st-todox-dashboard-banner__body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .st-todox-dashboard-banner__greeting {
+    font-size: 19px;
+  }
+
+  .st-todox-dashboard-banner__actions {
+    width: 100%;
+
+    .st-todox-dashboard-banner__btn {
+      flex: 1;
+      justify-content: center;
+    }
+  }
+
+  // Page header stacks
+  .st-todox-page-hd {
+    align-items: flex-start;
+  }
+
+  .st-todox-page-hd__actions {
+    width: 100%;
+    flex-wrap: wrap;
+
+    > * { flex: 1 1 auto; }
+  }
+
+  .st-todox-page-hd__title { font-size: 18px; }
+  .st-todox-page-hd__icon-box { width: 36px; height: 36px; }
+
+  // Modal: full-bleed on small screens for usability
+  .st-todox-modal-overlay {
+    padding: 0;
+    align-items: flex-end; // slide-up feel
+  }
+
+  .st-todox-modal,
+  .st-todox-modal.st-todox-modal--sm,
+  .st-todox-modal.st-todox-modal--md,
+  .st-todox-modal.st-todox-modal--lg {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: 0;
+  }
+
+  .st-todox-modal__header,
+  .st-todox-modal__footer { padding-left: 16px; padding-right: 16px; }
+  .st-todox-modal__body   { padding: 16px; }
+
+  // Confirm dialog matches modal full-bleed
+  .st-todox-confirm {
+    max-width: 100%;
+    border-radius: 18px 18px 0 0;
+  }
+
+  // Task detail modal: less generous padding
+  .st-todox-td-modal-overlay {
+    padding: 20px 8px 20px;
+  }
+
+  .st-todox-td-modal-wrap .st-todox-td {
+    padding: 16px;
+  }
+
+  .st-todox-td-modal-close {
+    top: -10px;
+    right: 8px;
+  }
+
+  // Tables become more compact and scroll horizontally
+  .st-todox-table {
+    font-size: 13px;
+    min-width: 560px;
+
+    thead th {
+      padding: 8px 10px;
+      &:first-child { padding-left: 14px; }
+      &:last-child  { padding-right: 14px; }
+    }
+
+    tbody td {
+      padding: 9px 10px;
+      &:first-child { padding-left: 14px; }
+      &:last-child  { padding-right: 14px; }
+    }
+  }
+
+  .st-todox-table__title-cell {
+    max-width: 200px;
+  }
+
+  // Empty state — less padding on mobile
+  .st-todox-empty-dashed {
+    padding: 48px 18px;
+    border-radius: 16px;
+  }
+}
+
+// ============================================================
+// Small phone ( < 480px ) — final compression
+// ============================================================
+@media (max-width: 479px) {
+
+  // Stat cards stack to a single column
+  .st-todox-stat2-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .st-todox-stat2-card__body { padding: 16px 16px 14px; }
+  .st-todox-stat2-card__value { font-size: 26px; }
+
+  // Hide the kbd hint completely on tiny phones (already hidden < 768)
+  .st-todox-topbar__search-kbd { display: none !important; }
+
+  // Hide the "New Task" text — icon-only
+  .st-todox-topbar__create-btn { padding: 6px 9px; }
+
+  // Topbar shrinks icon buttons slightly
+  .st-todox-topbar__icon-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  // Dashboard banner: smaller heading
+  .st-todox-dashboard-banner__greeting { font-size: 17px; }
+  .st-todox-dashboard-banner__date { font-size: 11px; }
+
+  // Page header icon hidden on very small to save space
+  .st-todox-page-hd__icon-box { display: none; }
+
+  // App padding tightens once more
+  .st-todox-app__inner { padding: 10px; }
+}
+
+// ============================================================
+// Tablet portrait ( 768–1023px ) — slightly looser than phone
+// ============================================================
+@media (min-width: 768px) and (max-width: 1023px) {
+  // Keep sidebar collapsed by default at tablet width for breathing room
+  // (user can still expand via the float toggle)
+  .st-todox-app__inner { padding: 20px; }
+}
+
+// ============================================================
+// Tasks page — responsive header, view switcher, toolbar, bulk bar
+// ============================================================
+
+// --- Tablet & below: tighten PageHeader spacing ---
+@media (max-width: 1023px) {
+  .st-todox-page-header { margin-bottom: 20px; }
+}
+
+// --- Phone ( < 768px ) ---
+@media (max-width: 767px) {
+  // PageHeader stacks: title block on top, actions below full-width
+  .st-todox-page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .st-todox-page-header__title { font-size: 19px; }
+  .st-todox-page-header__description { font-size: 12.5px; }
+
+  .st-todox-page-header__actions {
+    width: 100%;
+  }
+
+  .st-todox-page-header__btn-group {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    // View switcher grows; New Task button stays compact
+    .st-todox-view-switcher { flex: 1 1 100%; }
+    .st-todox-btn { flex: 0 0 auto; }
+  }
+
+  // View switcher: stretch buttons evenly across full width
+  .st-todox-view-switcher {
+    width: 100%;
+
+    &__btn {
+      flex: 1 1 0;
+      justify-content: center;
+      padding: 7px 8px;
+    }
+  }
+
+  // Status filter pills: tighten gap, allow scroll if too many
+  .st-todox-pills {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .st-todox-pill {
+    padding: 5px 10px;
+    font-size: 11.5px;
+  }
+
+  // Tasks toolbar: stack search above filters
+  .st-todox-tasks-toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .st-todox-tasks-toolbar__search {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .st-todox-tasks-toolbar__filters {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .st-todox-tasks-toolbar__select {
+    flex: 1 1 auto;
+    min-width: 140px;
+  }
+
+  // Bulk bar: stack count + actions vertically
+  .st-todox-bulk-bar {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+
+    &__actions {
+      margin-left: 0;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    &__sep { display: none; }
+  }
+
+  // Task table has many columns — give it more min-width so cells stay readable
+  .st-todox-table {
+    min-width: 760px;
+  }
+}
+
+// --- Small phone ( < 480px ): view switcher becomes icon-only ---
+@media (max-width: 479px) {
+  .st-todox-view-switcher__btn {
+    padding: 7px 6px;
+
+    // Hide text labels — icon-only on tiny screens
+    > span { display: none; }
+  }
+
+  // PageHeader title shrinks a touch more
+  .st-todox-page-header__title { font-size: 17px; }
+
+  // Pills wrap onto more rows, slightly tighter
+  .st-todox-pill {
+    padding: 4px 9px;
+    font-size: 11px;
+  }
+
+  // Toolbar select full-width on its own line
+  .st-todox-tasks-toolbar__select { flex: 1 1 100%; }
+}

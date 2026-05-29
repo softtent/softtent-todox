@@ -3,7 +3,7 @@
  */
 import { useEffect, Suspense } from '@wordpress/element';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useSelect } from '@wordpress/data';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { useQuery } from '@tanstack/react-query';
 
 /**
@@ -34,9 +34,31 @@ const AppLayout = () => {
 		[]
 	) as boolean;
 
+	const mobileDrawerOpen = useSelect(
+		( select: any ) => select( STORE_NAME ).isMobileDrawerOpen(),
+		[]
+	) as boolean;
+
+	const { closeMobileDrawer } = useDispatch( STORE_NAME );
+
 	const location  = useLocation();
 	const navigate  = useNavigate();
 	const isKanban  = location.pathname === '/tasks/kanban' || location.pathname === '/tasks/calendar';
+
+	// Auto-close mobile drawer on route change as a safety net.
+	useEffect( () => {
+		if ( mobileDrawerOpen ) closeMobileDrawer();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ location.pathname ] );
+
+	// Lock body scroll while drawer is open so the page behind doesn't scroll.
+	useEffect( () => {
+		if ( mobileDrawerOpen ) {
+			document.body.style.overflow = 'hidden';
+			return () => { document.body.style.overflow = ''; };
+		}
+		return undefined;
+	}, [ mobileDrawerOpen ] );
 
 	// First-run guard: if no workspaces exist yet, force the wizard.
 	const { data: workspaces, isLoading: wsLoading } = useQuery( {
@@ -68,8 +90,21 @@ const AppLayout = () => {
 	}
 
 	return (
-		<div className={ `st-todox-app ${ sidebarOpen ? 'st-todox-app--sidebar-open' : 'st-todox-app--sidebar-closed' }` }>
+		<div
+			className={ `st-todox-app ${ sidebarOpen ? 'st-todox-app--sidebar-open' : 'st-todox-app--sidebar-closed' } ${ mobileDrawerOpen ? 'st-todox-app--drawer-open' : '' }` }
+		>
 			<Sidebar />
+
+			{/* Mobile drawer backdrop — only rendered when drawer is open */}
+			{ mobileDrawerOpen && (
+				<button
+					type="button"
+					aria-label="Close navigation menu"
+					className="st-todox-app__backdrop"
+					onClick={ () => closeMobileDrawer() }
+				/>
+			) }
+
 			<div className="st-todox-app__body">
 				<Topbar />
 				<main className="st-todox-app__content">

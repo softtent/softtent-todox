@@ -30,6 +30,7 @@ import {
  */
 import { STORE_NAME } from '../../store/workspace';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import WorkspaceSwitcher from '../features/workspace/WorkspaceSwitcher';
 import Avatar from '../ui/Avatar';
 import { WORKSPACE_MODULE_DEFAULTS } from '../../types';
@@ -107,7 +108,13 @@ const Sidebar = () => {
 		[]
 	) as boolean;
 
-	const { toggleSidebar } = useDispatch( STORE_NAME );
+	const mobileDrawerOpen = useSelect(
+		( select: any ) => select( STORE_NAME ).isMobileDrawerOpen(),
+		[]
+	) as boolean;
+
+	const { toggleSidebar, closeMobileDrawer } = useDispatch( STORE_NAME );
+	const isMobile = useIsMobile();
 
 	const { activeWorkspace } = useWorkspace();
 	const modules = { ...WORKSPACE_MODULE_DEFAULTS, ...( activeWorkspace?.modules ?? {} ) };
@@ -144,10 +151,18 @@ const Sidebar = () => {
 	const toggleExpand = ( path: string ) =>
 		setExpanded( ( prev ) => ( { ...prev, [ path ]: ! prev[ path ] } ) );
 
-	const collapsed = ! sidebarOpen;
+	// On mobile, the sidebar renders as a full-width drawer regardless of the
+	// persisted desktop collapsed state — always show labels.
+	const collapsed = isMobile ? false : ! sidebarOpen;
+
+	const handleNavClick = () => {
+		if ( isMobile ) closeMobileDrawer();
+	};
 
 	return (
-		<aside className={ `st-todox-sidebar ${ collapsed ? 'st-todox-sidebar--collapsed' : 'st-todox-sidebar--expanded' }` }>
+		<aside
+			className={ `st-todox-sidebar ${ collapsed ? 'st-todox-sidebar--collapsed' : 'st-todox-sidebar--expanded' } ${ mobileDrawerOpen ? 'st-todox-sidebar--drawer-open' : '' }` }
+		>
 
 			{/* Floating toggle button */}
 			<button
@@ -193,7 +208,11 @@ const Sidebar = () => {
 									{ hasChildren ? (
 										<button
 											className={ `st-todox-sidebar__nav-item ${ active ? 'st-todox-sidebar__nav-item--active' : '' }` }
-											onClick={ () => { navigate( item.path ); if ( ! collapsed ) setExpanded( ( prev ) => ( { ...prev, [ item.path ]: true } ) ); } }
+											onClick={ () => {
+												navigate( item.path );
+												if ( ! collapsed ) setExpanded( ( prev ) => ( { ...prev, [ item.path ]: true } ) );
+												handleNavClick();
+											} }
 											data-label={ collapsed ? item.label : undefined }
 										>
 											<span className="st-todox-sidebar__nav-icon">
@@ -217,7 +236,7 @@ const Sidebar = () => {
 												`st-todox-sidebar__nav-item ${ ( a && ! item.soon ) ? 'st-todox-sidebar__nav-item--active' : '' } ${ item.soon ? 'st-todox-sidebar__nav-item--soon' : '' }`
 											}
 											data-label={ collapsed ? item.label : undefined }
-											onClick={ item.soon ? ( e ) => e.preventDefault() : undefined }
+											onClick={ item.soon ? ( e ) => e.preventDefault() : handleNavClick }
 										>
 											<span className="st-todox-sidebar__nav-icon">
 												<Icon size={ 16 } />
@@ -243,6 +262,7 @@ const Sidebar = () => {
 														className={ ( { isActive: a } ) =>
 															`st-todox-sidebar__sub-item ${ a ? 'st-todox-sidebar__sub-item--active' : '' }`
 														}
+														onClick={ handleNavClick }
 													>
 														<ChildIcon size={ 13 } />
 														{ child.label }
