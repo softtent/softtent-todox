@@ -23,6 +23,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import PriorityBadge from '../../components/ui/PriorityBadge';
 import Modal from '../../components/ui/Modal';
 import CreateTaskModal from '../../components/features/task/CreateTaskModal';
+import TaskDetailModal from '../../components/features/task/TaskDetailModal';
 import TaskProgressPanel from '../../components/features/dashboard/TaskProgressPanel';
 import ActivityFeed from '../../components/features/dashboard/ActivityFeed';
 import { formatDate, formatRelativeTime, isOverdue } from '../../utils/helpers';
@@ -186,6 +187,7 @@ const Dashboard = () => {
 
 	const [ createOpen, setCreateOpen ]         = useState( false );
 	const [ createTaskOpen, setCreateTaskOpen ] = useState( false );
+	const [ selectedTaskId, setSelectedTaskId ] = useState< number | null >( null );
 	const [ form, setForm ]                     = useState< CreateWorkspaceInput >( { name: '', color: '#6366f1' } );
 
 	const { data: stats, isLoading: statsLoading } = useQuery( {
@@ -389,7 +391,7 @@ const Dashboard = () => {
 										<tr
 											key={ task.id }
 											className={ `st-todox-table__row ${ isOverdue( task.due_date ) ? 'st-todox-table__row--overdue' : '' }` }
-											onClick={ () => navigate( `/tasks/${ task.id }` ) }
+											onClick={ () => setSelectedTaskId( task.id ) }
 											style={ { cursor: 'pointer' } }
 										>
 											<td className="st-todox-table__title-cell">
@@ -426,6 +428,11 @@ const Dashboard = () => {
 					workspaceId={ activeWorkspaceId }
 				/>
 			) }
+
+			<TaskDetailModal
+				taskId={ selectedTaskId }
+				onClose={ () => setSelectedTaskId( null ) }
+			/>
 		</div>
 	);
 };

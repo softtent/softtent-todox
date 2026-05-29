@@ -23,6 +23,49 @@ class Workspace {
 	private static string $members_table = 'st_todox_workspace_members';
 
 	/**
+	 * Toggleable modules and their default state.
+	 *
+	 * Adding a new key here automatically defaults to enabled for every
+	 * existing workspace — no migration needed because format() merges
+	 * stored values on top of these defaults.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @var array<string, bool>
+	 */
+	public const MODULE_DEFAULTS = [
+		'departments' => true,
+		'teams'       => true,
+		'projects'    => true,
+		'sprints'     => true,
+	];
+
+	/**
+	 * Sanitize a modules payload against MODULE_DEFAULTS.
+	 *
+	 * Unknown keys are dropped; values are coerced to bool.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param mixed $modules
+	 * @return array<string, bool>
+	 */
+	public static function sanitize_modules( $modules ): array {
+		if ( ! is_array( $modules ) ) {
+			return self::MODULE_DEFAULTS;
+		}
+
+		$clean = self::MODULE_DEFAULTS;
+		foreach ( self::MODULE_DEFAULTS as $key => $_default ) {
+			if ( array_key_exists( $key, $modules ) ) {
+				$clean[ $key ] = (bool) $modules[ $key ];
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * Get all workspaces the current user belongs to.
 	 *
 	 * @since 0.1.0
@@ -139,6 +182,7 @@ class Workspace {
 				'color'       => Fns::sanitize_color( $data['color'] ?? '#6366f1' ),
 				'owner_id'    => (int) $data['owner_id'],
 				'is_public'   => isset( $data['is_public'] ) ? 1 : 0,
+				'modules'     => wp_json_encode( self::sanitize_modules( $data['modules'] ?? null ) ),
 			]
 		);
 
@@ -183,6 +227,9 @@ class Workspace {
 		}
 		if ( isset( $data['is_public'] ) ) {
 			$update['is_public'] = (int) $data['is_public'];
+		}
+		if ( isset( $data['modules'] ) ) {
+			$update['modules'] = wp_json_encode( self::sanitize_modules( $data['modules'] ) );
 		}
 
 		if ( empty( $update ) ) {
@@ -423,6 +470,14 @@ class Workspace {
 	 * @return array<string, mixed>
 	 */
 	public static function format( array $row ): array {
+		$stored_modules = [];
+		if ( ! empty( $row['modules'] ) ) {
+			$decoded = json_decode( (string) $row['modules'], true );
+			if ( is_array( $decoded ) ) {
+				$stored_modules = $decoded;
+			}
+		}
+
 		return [
 			'id'                 => (int) $row['id'],
 			'name'               => $row['name'],
@@ -432,6 +487,7 @@ class Workspace {
 			'color'              => $row['color'],
 			'owner_id'           => (int) $row['owner_id'],
 			'is_public'          => (bool) $row['is_public'],
+			'modules'            => self::sanitize_modules( $stored_modules ),
 			'member_role'        => $row['member_role'] ?? null,
 			'members_count'      => (int) ( $row['members_count'] ?? 0 ),
 			'departments_count'  => (int) ( $row['departments_count'] ?? 0 ),

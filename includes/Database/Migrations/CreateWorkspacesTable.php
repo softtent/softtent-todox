@@ -25,6 +25,7 @@ class CreateWorkspacesTable {
 			`color`       VARCHAR(20)     NOT NULL DEFAULT '#6366f1',
 			`owner_id`    BIGINT UNSIGNED NOT NULL,
 			`is_public`   TINYINT(1)      NOT NULL DEFAULT 0,
+			`modules`     LONGTEXT        DEFAULT NULL,
 			`created_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			`updated_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY  (`id`),

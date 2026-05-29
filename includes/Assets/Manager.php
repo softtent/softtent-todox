@@ -169,7 +169,7 @@ class Manager {
 					'id'     => $current_user->ID,
 					'name'   => $current_user->display_name,
 					'email'  => $current_user->user_email,
-					'avatar' => get_avatar_url( $current_user->ID, [ 'size' => 40 ] ),
+					'avatar' => get_avatar_url( $current_user->ID, [ 'size' => 64 ] ),
 					'roles'  => $current_user->roles,
 				],
 			]

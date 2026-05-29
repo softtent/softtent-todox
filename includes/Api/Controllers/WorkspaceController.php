@@ -136,6 +136,7 @@ class WorkspaceController extends RestApi {
 				'description' => $req->get_param( 'description' ) ?? '',
 				'color'       => $req->get_param( 'color' ) ?? '#6366f1',
 				'is_public'   => $req->get_param( 'is_public' ) ?? false,
+				'modules'     => $req->get_param( 'modules' ),
 				'owner_id'    => $this->current_user_id(),
 			]
         );

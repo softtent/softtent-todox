@@ -32,6 +32,8 @@ import { STORE_NAME } from '../../store/workspace';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import WorkspaceSwitcher from '../features/workspace/WorkspaceSwitcher';
 import Avatar from '../ui/Avatar';
+import { WORKSPACE_MODULE_DEFAULTS } from '../../types';
+import type { WorkspaceModuleKey } from '../../types';
 
 interface NavChild {
 	path:  string;
@@ -45,6 +47,7 @@ interface NavItem {
 	label:     string;
 	icon:      React.ComponentType<{ size?: number; className?: string }>;
 	soon?:     boolean;
+	module?:   WorkspaceModuleKey;
 	children?: NavChild[];
 }
 
@@ -63,10 +66,10 @@ const NAV_GROUPS: NavGroup[] = [
 	{
 		label: 'Work',
 		items: [
-			{ path: '/departments', label: 'Departments', icon: Building2 },
-			{ path: '/teams',       label: 'Teams',        icon: Briefcase },
-			{ path: '/projects',    label: 'Projects',     icon: FolderKanban },
-			{ path: '/sprints',     label: 'Sprints',      icon: Zap },
+			{ path: '/departments', label: 'Departments', icon: Building2,    module: 'departments' },
+			{ path: '/teams',       label: 'Teams',        icon: Briefcase,    module: 'teams'       },
+			{ path: '/projects',    label: 'Projects',     icon: FolderKanban, module: 'projects'    },
+			{ path: '/sprints',     label: 'Sprints',      icon: Zap,          module: 'sprints'     },
 			{
 				path:     '/tasks',
 				label:    'Tasks',
@@ -105,6 +108,16 @@ const Sidebar = () => {
 	) as boolean;
 
 	const { toggleSidebar } = useDispatch( STORE_NAME );
+
+	const { activeWorkspace } = useWorkspace();
+	const modules = { ...WORKSPACE_MODULE_DEFAULTS, ...( activeWorkspace?.modules ?? {} ) };
+
+	const visibleGroups = NAV_GROUPS
+		.map( ( group ) => ( {
+			...group,
+			items: group.items.filter( ( item ) => ! item.module || modules[ item.module ] ),
+		} ) )
+		.filter( ( group ) => group.items.length > 0 );
 
 	const [ expanded, setExpanded ] = useState< Record< string, boolean > >( {
 		'/tasks': location.pathname.startsWith( '/tasks' ),
@@ -163,7 +176,7 @@ const Sidebar = () => {
 
 			{/* Navigation */}
 			<nav className="st-todox-sidebar__nav">
-				{ NAV_GROUPS.map( ( group ) => (
+				{ visibleGroups.map( ( group ) => (
 					<div key={ group.label } className="st-todox-sidebar__nav-group">
 						{ ! collapsed && (
 							<span className="st-todox-sidebar__nav-group-label">{ group.label }</span>

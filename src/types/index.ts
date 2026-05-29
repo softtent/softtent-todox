@@ -27,6 +27,22 @@ export interface User {
 // Workspace
 // ============================================
 
+export interface WorkspaceModules {
+	departments: boolean;
+	teams:       boolean;
+	projects:    boolean;
+	sprints:     boolean;
+}
+
+export type WorkspaceModuleKey = keyof WorkspaceModules;
+
+export const WORKSPACE_MODULE_DEFAULTS: WorkspaceModules = {
+	departments: true,
+	teams:       true,
+	projects:    true,
+	sprints:     true,
+};
+
 export interface Workspace {
 	id: number;
 	name: string;
@@ -37,6 +53,7 @@ export interface Workspace {
 	owner_id: number;
 	owner?: User;
 	is_public: boolean;
+	modules: WorkspaceModules;
 	member_role?: WorkspaceRole;
 	members_count?: number;
 	departments_count?: number;
@@ -325,6 +342,7 @@ export interface CreateWorkspaceInput {
 	description?: string;
 	color?: string;
 	is_public?: boolean;
+	modules?: WorkspaceModules;
 }
 
 export interface CreateDepartmentInput {

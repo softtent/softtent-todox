@@ -3,7 +3,7 @@
  */
 import { useState, useEffect } from '@wordpress/element';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import {
 	User,
@@ -16,23 +16,39 @@ import {
 	ChevronRight,
 	Tag,
 	Bookmark,
+	Boxes,
+	Building2,
+	Briefcase,
+	FolderKanban,
+	Zap,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * Internal dependencies
  */
 import { api } from '../../utils/api';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { workspacesApi } from '../../api';
+import { WORKSPACE_MODULE_DEFAULTS } from '../../types';
+import type { WorkspaceModules, WorkspaceModuleKey } from '../../types';
 import Avatar from '../../components/ui/Avatar';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import StatusesSection from './StatusesSection';
 import LabelsSection from './LabelsSection';
 
-type Section = 'profile' | 'general' | 'statuses' | 'labels' | 'notifications' | 'data';
+type Section = 'profile' | 'general' | 'modules' | 'statuses' | 'labels' | 'notifications' | 'data';
 
-const SECTIONS: Section[] = [ 'profile', 'general', 'statuses', 'labels', 'notifications', 'data' ];
+const SECTIONS: Section[] = [ 'profile', 'general', 'modules', 'statuses', 'labels', 'notifications', 'data' ];
 const DEFAULT_SECTION: Section = 'profile';
+
+const MODULE_ITEMS: { key: WorkspaceModuleKey; label: string; hint: string; icon: LucideIcon }[] = [
+	{ key: 'departments', label: 'Departments', hint: 'Organize people into departments.',         icon: Building2 },
+	{ key: 'teams',       label: 'Teams',       hint: 'Group members into cross-functional teams.', icon: Briefcase },
+	{ key: 'projects',    label: 'Projects',    hint: 'Track work in projects.',                    icon: FolderKanban },
+	{ key: 'sprints',     label: 'Sprints',     hint: 'Plan work in time-boxed sprints.',           icon: Zap },
+];
 
 const isSection = ( v: string | undefined ): v is Section =>
 	!! v && ( SECTIONS as string[] ).includes( v );
@@ -48,6 +64,7 @@ interface Settings {
 const NAV_ITEMS: { id: Section; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
 	{ id: 'profile',       label: 'Profile',          icon: User },
 	{ id: 'general',       label: 'General',           icon: Settings2 },
+	{ id: 'modules',       label: 'Modules',           icon: Boxes },
 	{ id: 'statuses',      label: 'Statuses',          icon: Tag },
 	{ id: 'labels',        label: 'Labels',            icon: Bookmark },
 	{ id: 'notifications', label: 'Notifications',     icon: Bell },
@@ -153,7 +170,32 @@ const SettingsPage = () => {
 
 	const handleSave = () => saveMutation.mutate( form );
 
-	const { activeWorkspaceId } = useWorkspace();
+	const { activeWorkspaceId, activeWorkspace } = useWorkspace();
+	const queryClient = useQueryClient();
+
+	const canManageWorkspace =
+		activeWorkspace?.member_role === 'owner' || activeWorkspace?.member_role === 'admin';
+
+	const [ modulesForm, setModulesForm ] = useState< WorkspaceModules >( WORKSPACE_MODULE_DEFAULTS );
+
+	useEffect( () => {
+		if ( activeWorkspace ) {
+			setModulesForm( { ...WORKSPACE_MODULE_DEFAULTS, ...( activeWorkspace.modules ?? {} ) } );
+		}
+	}, [ activeWorkspace?.id, activeWorkspace?.modules ] );
+
+	const modulesMutation = useMutation( {
+		mutationFn: ( modules: WorkspaceModules ) =>
+			workspacesApi.update( activeWorkspaceId as number, { modules } ),
+		onSuccess: () => {
+			queryClient.invalidateQueries( { queryKey: [ 'workspaces' ] } );
+			toast.success( 'Modules updated.' );
+		},
+		onError: ( err: Error ) => toast.error( err.message ),
+	} );
+
+	const setModule = ( key: WorkspaceModuleKey, value: boolean ) =>
+		setModulesForm( ( prev ) => ( { ...prev, [ key ]: value } ) );
 
 	const userName  = stTodoxParams?.currentUser?.name ?? 'User';
 	const userEmail = stTodoxParams?.currentUser?.email ?? '';
@@ -305,6 +347,73 @@ const SettingsPage = () => {
 									Save Changes
 								</Button>
 							</div>
+						</div>
+					) }
+
+					{ activeSection === 'modules' && ! activeWorkspaceId && (
+						<div className="st-todox-settings-stack">
+							<div className="st-todox-settings-info-banner st-todox-settings-info-banner--blue">
+								<Boxes size={ 14 } className="st-todox-settings-info-banner__icon" />
+								<p>Please select or create a workspace first to manage modules.</p>
+							</div>
+						</div>
+					) }
+
+					{ activeSection === 'modules' && activeWorkspaceId && (
+						<div className="st-todox-settings-stack">
+							<Card
+								icon={ Boxes }
+								title="Workspace Modules"
+								description="Turn off the features you don't need. Tasks are always enabled."
+							>
+								<div className="st-todox-settings-toggles">
+									{ MODULE_ITEMS.map( ( m ) => {
+										const Icon = m.icon;
+										return (
+											<label key={ m.key } className="st-todox-settings-toggle">
+												<div
+													className="st-todox-settings-toggle__text"
+													style={ { display: 'flex', gap: 10, alignItems: 'flex-start' } }
+												>
+													<Icon size={ 16 } />
+													<div>
+														<span className="st-todox-settings-toggle__label">{ m.label }</span>
+														<span className="st-todox-settings-toggle__hint">{ m.hint }</span>
+													</div>
+												</div>
+												<button
+													type="button"
+													role="switch"
+													aria-checked={ modulesForm[ m.key ] }
+													disabled={ ! canManageWorkspace }
+													className={ `st-todox-settings-switch ${ modulesForm[ m.key ] ? 'st-todox-settings-switch--on' : '' }` }
+													onClick={ () => setModule( m.key, ! modulesForm[ m.key ] ) }
+												>
+													<span className="st-todox-settings-switch__thumb" />
+												</button>
+											</label>
+										);
+									} ) }
+								</div>
+							</Card>
+
+							{ ! canManageWorkspace && (
+								<div className="st-todox-settings-info-banner st-todox-settings-info-banner--amber">
+									<AlertTriangle size={ 14 } className="st-todox-settings-info-banner__icon" />
+									<p>Only the workspace owner or an admin can change modules.</p>
+								</div>
+							) }
+
+							{ canManageWorkspace && (
+								<div className="st-todox-settings-save-row">
+									<Button
+										onClick={ () => modulesMutation.mutate( modulesForm ) }
+										loading={ modulesMutation.isPending }
+									>
+										Save Modules
+									</Button>
+								</div>
+							) }
 						</div>
 					) }
 

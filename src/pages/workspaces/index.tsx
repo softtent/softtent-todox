@@ -7,7 +7,9 @@ import { toast } from 'react-toastify';
 import {
 	Building2, Users, Crown, MoreHorizontal, Pencil, Trash2,
 	CheckCircle2, UserPlus, Plus, Check,
+	Briefcase, FolderKanban, Zap,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * Internal dependencies
@@ -20,7 +22,11 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Spinner from '../../components/ui/Spinner';
 import Avatar from '../../components/ui/Avatar';
 import { ColorPicker, COLORS_WORKSPACE } from '../../components/inputs';
-import type { Workspace, WorkspaceMember, CreateWorkspaceInput, WorkspaceRole } from '../../types';
+import type {
+	Workspace, WorkspaceMember, CreateWorkspaceInput, WorkspaceRole,
+	WorkspaceModules, WorkspaceModuleKey,
+} from '../../types';
+import { WORKSPACE_MODULE_DEFAULTS } from '../../types';
 
 const ROLE_CONFIG: Record< WorkspaceRole, { label: string; className: string } > = {
 	owner:  { label: 'Owner',  className: 'st-todox-role-badge st-todox-role-badge--owner' },
@@ -30,6 +36,42 @@ const ROLE_CONFIG: Record< WorkspaceRole, { label: string; className: string } >
 };
 
 const canManage = ( role?: WorkspaceRole ) => role === 'owner' || role === 'admin';
+
+const MODULE_ITEMS: { key: WorkspaceModuleKey; label: string; hint: string; icon: LucideIcon }[] = [
+	{ key: 'departments', label: 'Departments', hint: 'Organize people into departments.',         icon: Building2 },
+	{ key: 'teams',       label: 'Teams',       hint: 'Group members into cross-functional teams.', icon: Briefcase },
+	{ key: 'projects',    label: 'Projects',    hint: 'Track work in projects.',                    icon: FolderKanban },
+	{ key: 'sprints',     label: 'Sprints',     hint: 'Plan work in time-boxed sprints.',           icon: Zap },
+];
+
+interface ModuleToggleRowProps {
+	label:    string;
+	hint:     string;
+	icon:     LucideIcon;
+	checked:  boolean;
+	onChange: ( v: boolean ) => void;
+}
+
+const ModuleToggleRow = ( { label, hint, icon: Icon, checked, onChange }: ModuleToggleRowProps ) => (
+	<label className="st-todox-settings-toggle">
+		<div className="st-todox-settings-toggle__text" style={ { display: 'flex', gap: 10, alignItems: 'flex-start' } }>
+			<Icon size={ 16 } />
+			<div>
+				<span className="st-todox-settings-toggle__label">{ label }</span>
+				<span className="st-todox-settings-toggle__hint">{ hint }</span>
+			</div>
+		</div>
+		<button
+			type="button"
+			role="switch"
+			aria-checked={ checked }
+			className={ `st-todox-settings-switch ${ checked ? 'st-todox-settings-switch--on' : '' }` }
+			onClick={ () => onChange( ! checked ) }
+		>
+			<span className="st-todox-settings-switch__thumb" />
+		</button>
+	</label>
+);
 
 const WorkspacesPage = () => {
 	const qc = useQueryClient();
@@ -45,7 +87,11 @@ const WorkspacesPage = () => {
 	const [ menuOpen, setMenuOpen ]           = useState< number | null >( null );
 
 	// ── Forms ──
-	const [ createForm, setCreateForm ] = useState< CreateWorkspaceInput >( { name: '', color: '#6366f1' } );
+	const [ createForm, setCreateForm ] = useState< CreateWorkspaceInput >( {
+		name:    '',
+		color:   '#6366f1',
+		modules: { ...WORKSPACE_MODULE_DEFAULTS },
+	} );
 	const [ editForm, setEditForm ]     = useState< Partial< CreateWorkspaceInput > >( {} );
 	const [ inviteUserId, setInviteUserId ] = useState( '' );
 	const [ inviteRole, setInviteRole ]     = useState< WorkspaceRole >( 'member' );
@@ -72,7 +118,7 @@ const WorkspacesPage = () => {
 			invalidate();
 			switchWorkspace( ws );
 			setCreateOpen( false );
-			setCreateForm( { name: '', color: '#6366f1' } );
+			setCreateForm( { name: '', color: '#6366f1', modules: { ...WORKSPACE_MODULE_DEFAULTS } } );
 			toast.success( 'Workspace created!' );
 		},
 		onError: ( err: Error ) => toast.error( err.message ),
@@ -113,9 +159,34 @@ const WorkspacesPage = () => {
 	// ── Handlers ──
 	const openEdit = ( ws: Workspace ) => {
 		setEditTarget( ws );
-		setEditForm( { name: ws.name, description: ws.description ?? '', color: ws.color } );
+		setEditForm( {
+			name:        ws.name,
+			description: ws.description ?? '',
+			color:       ws.color,
+			modules:     { ...WORKSPACE_MODULE_DEFAULTS, ...( ws.modules ?? {} ) },
+		} );
 		setMenuOpen( null );
 	};
+
+	const toggleModule = < T extends { modules?: WorkspaceModules } >(
+		updater: ( fn: ( prev: T ) => T ) => void,
+		key:    WorkspaceModuleKey,
+		value:  boolean,
+	) => {
+		updater( ( prev ) => ( {
+			...prev,
+			modules: {
+				...WORKSPACE_MODULE_DEFAULTS,
+				...( prev.modules ?? {} ),
+				[ key ]: value,
+			},
+		} ) );
+	};
+
+	const setEditModule   = ( key: WorkspaceModuleKey, value: boolean ) =>
+		toggleModule( setEditForm, key, value );
+	const setCreateModule = ( key: WorkspaceModuleKey, value: boolean ) =>
+		toggleModule( setCreateForm, key, value );
 
 	const openInvite = ( ws: Workspace ) => {
 		setInviteTarget( ws );
@@ -359,6 +430,25 @@ const WorkspacesPage = () => {
 						<label className="st-todox-form__label">Color</label>
 						<ColorPicker colors={ COLORS_WORKSPACE } value={ createForm.color } onChange={ ( c ) => setCreateForm( { ...createForm, color: c } ) } />
 					</div>
+
+					<div className="st-todox-form__group">
+						<label className="st-todox-form__label">Modules</label>
+						<p className="st-todox-form__hint" style={ { marginTop: 0, marginBottom: 8 } }>
+							Turn off modules you don't need. Tasks are always enabled. You can change this later.
+						</p>
+						<div className="st-todox-settings-toggles">
+							{ MODULE_ITEMS.map( ( m ) => (
+								<ModuleToggleRow
+									key={ m.key }
+									label={ m.label }
+									hint={ m.hint }
+									icon={ m.icon }
+									checked={ createForm.modules?.[ m.key ] ?? true }
+									onChange={ ( v ) => setCreateModule( m.key, v ) }
+								/>
+							) ) }
+						</div>
+					</div>
 				</form>
 			</Modal>
 
@@ -409,6 +499,27 @@ const WorkspacesPage = () => {
 							onChange={ ( e ) => setEditForm( { ...editForm, description: e.target.value } ) }
 						/>
 					</div>
+
+					{ canManage( editTarget?.member_role ) && (
+						<div className="st-todox-form__group">
+							<label className="st-todox-form__label">Modules</label>
+							<p className="st-todox-form__hint" style={ { marginTop: 0, marginBottom: 8 } }>
+								Turn off modules you don't need. Tasks are always enabled.
+							</p>
+							<div className="st-todox-settings-toggles">
+								{ MODULE_ITEMS.map( ( m ) => (
+									<ModuleToggleRow
+										key={ m.key }
+										label={ m.label }
+										hint={ m.hint }
+										icon={ m.icon }
+										checked={ editForm.modules?.[ m.key ] ?? true }
+										onChange={ ( v ) => setEditModule( m.key, v ) }
+									/>
+								) ) }
+							</div>
+						</div>
+					) }
 				</form>
 			</Modal>
 
