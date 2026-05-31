@@ -46,12 +46,12 @@ class ProjectController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'index' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'has_workspace_access' ],
 				],
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'has_workspace_access' ],
 				],
 			]
         );

@@ -42,7 +42,7 @@ class Menu {
 
 		// Point the menu item directly to the frontend URL instead of admin.php?page=….
 		global $menu;
-		$app_url = App::get_page_url();
+		$app_url = esc_url( App::get_page_url() );
 		foreach ( $menu as $key => $item ) {
 			if ( isset( $item[2] ) && $item[2] === \ST_TODOX_SLUG ) {
 				$menu[ $key ][2] = $app_url; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited

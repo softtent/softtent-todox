@@ -350,8 +350,8 @@ class Workspace {
 			return [];
 		}
 
-		$table_members = $wpdb->prefix . self::$members_table;
-		$users_table   = $wpdb->users;
+		$table_members = esc_sql( $wpdb->prefix . self::$members_table );
+		$users_table   = esc_sql( $wpdb->users );
 		$placeholders  = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
 
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching

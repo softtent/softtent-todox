@@ -60,17 +60,32 @@ class TaxonomyController extends RestApi {
 			return $this->can_access_workspace( $ws_id );
 		};
 
+		$store_permission = function ( \WP_REST_Request $req ) {
+			if ( ! is_user_logged_in() ) {
+				return new \WP_Error(
+					'rest_not_logged_in',
+					esc_html__( 'Authentication required.', 'softtent-todox' ),
+					[ 'status' => 401 ]
+				);
+			}
+			// Global taxonomies require admin; workspace-scoped require membership.
+			if ( $req->get_param( 'is_global' ) ) {
+				return $this->is_admin( $req );
+			}
+			return $this->can_access_workspace( (int) ( $req->get_param( 'workspace_id' ) ?? 0 ) );
+		};
+
 		register_rest_route(
             $this->namespace, '/' . $this->base, [
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'index' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'has_workspace_access' ],
 				],
 				[
 					'methods' => 'POST',
 					'callback' => [ $this, 'store' ],
-					'permission_callback' => [ $this, 'is_logged_in' ],
+					'permission_callback' => $store_permission,
 				],
 			]
         );
@@ -130,19 +145,10 @@ class TaxonomyController extends RestApi {
 		$is_global    = (bool) $req->get_param( 'is_global' );
 		$workspace_id = null;
 
-		if ( $is_global ) {
-			if ( ! current_user_can( 'manage_options' ) ) {
-				return $this->error( esc_html__( 'Only administrators can create global taxonomies.', 'softtent-todox' ), 403 );
-			}
-		} else {
+		if ( ! $is_global ) {
 			$workspace_id = (int) $req->get_param( 'workspace_id' );
 			if ( ! $workspace_id ) {
 				return $this->error( esc_html__( 'workspace_id is required for workspace-scoped taxonomies.', 'softtent-todox' ) );
-			}
-
-			$access = $this->can_access_workspace( $workspace_id );
-			if ( $access !== true ) {
-				return $this->error( esc_html__( 'You are not a member of this workspace.', 'softtent-todox' ), 403 );
 			}
 		}
 

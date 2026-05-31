@@ -24,7 +24,7 @@ class DashboardController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'stats' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'has_workspace_access' ],
 				],
 			]
         );
@@ -34,7 +34,7 @@ class DashboardController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'recent_tasks' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'has_workspace_access' ],
 				],
 			]
         );
@@ -44,7 +44,7 @@ class DashboardController extends RestApi {
 				[
 					'methods' => 'GET',
 					'callback' => [ $this, 'recent_activity' ],
-					'permission_callback' => [ $this, 'is_workspace_member' ],
+					'permission_callback' => [ $this, 'has_workspace_access' ],
 				],
 			]
         );

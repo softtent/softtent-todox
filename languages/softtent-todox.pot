@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-05-29T06:01:08+00:00\n"
+"POT-Creation-Date: 2026-05-31T09:14:13+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.11.0\n"
 "X-Domain: softtent-todox\n"
@@ -46,6 +46,7 @@ msgstr ""
 #: includes/Abstracts/RestApi.php:74
 #: includes/Abstracts/RestApi.php:104
 #: includes/Abstracts/RestApi.php:164
+#: includes/Api/Controllers/TaxonomyController.php:67
 #: includes/Api/Controllers/UserController.php:60
 msgid "Authentication required."
 msgstr ""
@@ -63,7 +64,6 @@ msgid "Workspace context is required."
 msgstr ""
 
 #: includes/Abstracts/RestApi.php:184
-#: includes/Api/Controllers/TaxonomyController.php:145
 msgid "You are not a member of this workspace."
 msgstr ""
 
@@ -80,7 +80,7 @@ msgstr ""
 #: includes/Api/Controllers/DepartmentController.php:94
 #: includes/Api/Controllers/DepartmentController.php:120
 #: includes/Api/Controllers/ProjectController.php:94
-#: includes/Api/Controllers/TaxonomyController.php:108
+#: includes/Api/Controllers/TaxonomyController.php:123
 #: includes/Api/Controllers/TeamController.php:119
 msgid "workspace_id is required."
 msgstr ""
@@ -307,43 +307,39 @@ msgstr ""
 msgid "Taxonomy not found."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:121
+#: includes/Api/Controllers/TaxonomyController.php:136
 msgid "Taxonomy name is required."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:127
+#: includes/Api/Controllers/TaxonomyController.php:142
 msgid "Invalid taxonomy type."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:135
-msgid "Only administrators can create global taxonomies."
-msgstr ""
-
-#: includes/Api/Controllers/TaxonomyController.php:140
+#: includes/Api/Controllers/TaxonomyController.php:151
 msgid "workspace_id is required for workspace-scoped taxonomies."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:162
+#: includes/Api/Controllers/TaxonomyController.php:168
 msgid "Taxonomy created."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:163
+#: includes/Api/Controllers/TaxonomyController.php:169
 msgid "Failed to create taxonomy."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:184
+#: includes/Api/Controllers/TaxonomyController.php:190
 msgid "Taxonomy updated."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:190
+#: includes/Api/Controllers/TaxonomyController.php:196
 msgid "Taxonomy deleted."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:197
+#: includes/Api/Controllers/TaxonomyController.php:203
 msgid "items must be an array."
 msgstr ""
 
-#: includes/Api/Controllers/TaxonomyController.php:202
+#: includes/Api/Controllers/TaxonomyController.php:208
 msgid "Taxonomies reordered."
 msgstr ""
 

@@ -135,13 +135,13 @@ abstract class RestApi extends WP_REST_Controller {
 	 * Permission check: user must be a member of the workspace specified in
 	 * the request `workspace_id` parameter.
 	 *
-	 * Unlike the previous behaviour, this denies when workspace_id is missing
-	 * — callers must provide a workspace context. Routes that resolve the
-	 * workspace from a resource ID should use can_access_workspace() directly.
+	 * Denies when workspace_id is missing — callers must provide a workspace
+	 * context. Routes that resolve the workspace from a resource ID should use
+	 * can_access_workspace() directly.
 	 *
 	 * @since 0.1.0
 	 */
-	public function is_workspace_member( \WP_REST_Request $req ): bool|WP_Error {
+	public function has_workspace_access( \WP_REST_Request $req ): bool|WP_Error {
 		$workspace_id = (int) ( $req->get_param( 'workspace_id' ) ?? 0 );
 
 		return $this->can_access_workspace( $workspace_id );
@@ -150,7 +150,7 @@ abstract class RestApi extends WP_REST_Controller {
 	/**
 	 * Permission check: user must be a member of the given workspace.
 	 *
-	 * Unlike is_workspace_member(), this REQUIRES a workspace ID and denies
+	 * Unlike has_workspace_access(), this REQUIRES a workspace ID and denies
 	 * by default. Use this from route closures that resolve the workspace
 	 * from the target resource (task, comment, etc.) instead of from request
 	 * params, so callers cannot bypass the check by omitting workspace_id.

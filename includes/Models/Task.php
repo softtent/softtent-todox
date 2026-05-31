@@ -203,7 +203,7 @@ class Task {
 			return [];
 		}
 
-		$tt           = $wpdb->prefix . self::$table;
+		$tt           = esc_sql( $wpdb->prefix . self::$table );
 		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 		$rows = $wpdb->get_results(
@@ -246,7 +246,7 @@ class Task {
 			return $map;
 		}
 
-		$st           = $wpdb->prefix . 'st_todox_subtasks';
+		$st           = esc_sql( $wpdb->prefix . 'st_todox_subtasks' );
 		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
@@ -512,7 +512,7 @@ class Task {
 			return false;
 		}
 
-		$tt           = $wpdb->prefix . self::$table;
+		$tt           = esc_sql( $wpdb->prefix . self::$table );
 		$placeholders = implode( ',', array_fill( 0, count( $valid_ids ), '%d' ) );
 
 		$position_case = 'CASE id';
@@ -538,7 +538,7 @@ class Task {
 
 		$values = array_merge( $values, $valid_ids );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$wpdb->query(
 			$wpdb->prepare(
 				"UPDATE `{$tt}` SET position = {$position_case}{$status_sql} WHERE id IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
@@ -792,7 +792,7 @@ class Task {
 
 		global $wpdb;
 
-		$tt           = $wpdb->prefix . 'st_todox_taxonomies';
+		$tt           = esc_sql( $wpdb->prefix . 'st_todox_taxonomies' );
 		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
